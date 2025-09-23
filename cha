@@ -1,13 +1,39 @@
-SELECT vornr, aufpl, aplzl, objnr
-  FROM afvc
-  WHERE aufpl = @ps_order-aufpl
-  ORDER BY aplzl
-  INTO @DATA(ls_afvc)
-  UP TO 1 ROWS.
+REPORT zin_cmx_workorder.
 
-IF sy-subrc = 0.
-  pv_vornr = ls_afvc-vornr.
-  lv_aufpl = ls_afvc-aufpl.
-  lv_aplzl = ls_afvc-aplzl.
-  lv_objnr = ls_afvc-objnr.
-ENDIF.
+*-------------------------------------------------------------*
+*  Include: Selection Screen
+*-------------------------------------------------------------*
+INCLUDE zin_cmx_workorder_sel.   "PARAMETERS, SELECT-OPTIONS
+
+*-------------------------------------------------------------*
+*  Include: Global Data / Constants
+*-------------------------------------------------------------*
+INCLUDE zin_cmx_workorder_top.   "Constants, internal tables
+
+*-------------------------------------------------------------*
+*  Include: Forms
+*-------------------------------------------------------------*
+INCLUDE zin_cmx_workorder_f01.   "All FORM routines
+
+*-------------------------------------------------------------*
+*  START-OF-SELECTION
+*-------------------------------------------------------------*
+START-OF-SELECTION.
+
+  PERFORM f_get_orders.          "Fetch orders
+
+  LOOP AT gt_orders INTO gs_order.
+    PERFORM f_check_status USING gs_order.
+  ENDLOOP.
+
+*-------------------------------------------------------------*
+*  END-OF-SELECTION
+*-------------------------------------------------------------*
+END-OF-SELECTION.
+
+  IF gt_output IS NOT INITIAL.
+    PERFORM f_display_output.    "Show ALV
+    PERFORM f_send_cmx.          "Send CMX update (BAPI)
+  ELSE.
+    WRITE: / 'No matching orders found.'.
+  ENDIF.
