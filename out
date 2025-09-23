@@ -1,0 +1,29 @@
+Program Output 
+
+ 
+
+Once the program run has finished, there will be an output displaying all the orders that were sent. The data to be displayed will be: 
+
+Message type for CMX = CREATE. 
+
+Plant (VIAUFKST-WERKS). 
+
+Order number (VIAUFKST-AUFNR). 
+
+Operation number (VIAUFKST-AFVC-VORNR). 
+
+Order header status (TJ02T-TXT04). 
+
+Technical object: 
+
+If VIAUFKST-EQUNR is not blank, then VIAUFKST-EQUNR. 
+
+If VIAUFKST-EQUNR is blank, then ILOA-TPLNR. 
+
+Basic start date (VIAUFKST-GSTRP). 
+
+Basic finish date (VIAUFKST-GLTRP). 
+
+Final due date (VIAUFKST-LACD_DATE). 
+
+Error text. To be displayed only if the function module to update the user status failed. In this case, it should show the error message 72 character text. 
