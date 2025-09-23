@@ -1,0 +1,287 @@
+*&---------------------------------------------------------------------*
+*& Include          ZIN_CMX_WORKORDER_F01
+*& FORM routines for Orders → CMX interface
+*&---------------------------------------------------------------------*
+
+
+*---------------------------------------------------------------------*
+* Main FORM to fetch orders
+*---------------------------------------------------------------------*
+FORM f_get_orders.
+
+  DATA: lt_orders TYPE TABLE OF viaufkst,
+        ls_order  TYPE viaufkst.
+
+  "Step 1: Get INTERFACE characteristic ID
+  SELECT SINGLE atinn INTO gv_atinn
+    FROM cabn
+   WHERE atnam = 'INTERFACE'.
+
+  IF sy-subrc <> 0.
+    MESSAGE 'Characteristic INTERFACE not found' TYPE 'E'.
+  ENDIF.
+
+  "Step 2: Select candidate orders
+  SELECT * FROM viaufkst
+    INTO TABLE lt_orders
+   WHERE auart IN so_auart
+     AND iwerk IN so_werks
+     AND aufnr IN so_aufnr
+     AND equnr IN so_equnr
+     AND tplnr IN so_floc.
+
+  LOOP AT lt_orders INTO ls_order.
+    PERFORM f_validate USING ls_order.
+  ENDLOOP.
+
+ENDFORM.                    " f_get_orders
+
+*---------------------------------------------------------------------*
+* Validate order eligibility
+*---------------------------------------------------------------------*
+FORM f_validate USING ps_order TYPE viaufkst.
+
+  DATA: lv_obj   TYPE cuobj,
+        lv_value TYPE atwrt.
+
+  "Step 3: Check technical object assignment
+  IF ps_order-equnr IS NOT INITIAL.
+    SELECT SINGLE cuobj INTO lv_obj
+      FROM inob
+     WHERE objek = ps_order-equnr.
+  ELSE.
+    SELECT SINGLE cuobj INTO lv_obj
+      FROM inob
+     WHERE objek = ps_order-tplnr.
+  ENDIF.
+
+  IF lv_obj IS INITIAL.
+    RETURN. "Skip if no classification object
+  ENDIF.
+
+  "Step 4: Check INTERFACE = CMX
+  SELECT SINGLE atwrt INTO lv_value
+    FROM ausp
+   WHERE objek = lv_obj
+     AND atinn = gv_atinn.
+
+  IF lv_value <> 'CMX'.
+    RETURN. "Skip if not CMX relevant
+  ENDIF.
+
+  "Step 5: Check statuses and changes
+  PERFORM f_check_status USING ps_order.
+
+ENDFORM.                    " f_validate
+
+*---------------------------------------------------------------------*
+* Check order statuses and changes
+*---------------------------------------------------------------------*
+FORM f_check_status USING ps_order TYPE viaufkst.
+
+  DATA: lv_date  TYPE udate,
+        lv_time  TYPE utime,
+        lv_objid TYPE c LENGTH 20,
+        lv_vornr TYPE vornr,
+        lv_stat  TYPE jstat.
+
+  "Check if Released/TECO/Locked
+  SELECT SINGLE stat
+    INTO lv_stat
+    FROM jest
+   WHERE objnr = ps_order-objnr
+     AND stat IN (c_stat_rel, c_stat_teco, c_stat_lkd)
+     AND inact = ''.
+
+  IF sy-subrc <> 0.
+    RETURN. "Not relevant
+  ENDIF.
+
+  "Skip if CMXC is active
+  SELECT SINGLE stat
+    INTO @lv_stat
+    FROM jest
+   WHERE objnr = @ps_order-objnr
+     AND stat = @c_stat_cmxc
+     AND inact = ''.
+  IF sy-subrc = 0.
+    RETURN.
+  ENDIF.
+
+  "Check changes in CDHDR
+  CONCATENATE sy-mandt '30' ps_order-aufnr INTO lv_objid.
+  SELECT MAX( udate ) MAX( utime )
+    INTO (lv_date, lv_time)
+    FROM cdhdr
+   WHERE objectclas = 'ORDER'
+     AND objectid    = lv_objid.
+
+  IF ( lv_date < so_date-low
+       OR ( lv_date = so_date-low AND lv_time < so_time-low ) ).
+    "Not changed since last run → check if already sent
+    SELECT SINGLE stat
+      INTO @lv_stat
+      FROM jest
+     WHERE objnr = @ps_order-objnr
+       AND stat = @c_stat_cmxs
+       AND inact = ''.
+    IF sy-subrc = 0.
+      RETURN. "Already sent
+    ENDIF.
+  ENDIF.
+
+  "Get first active operation
+  PERFORM f_get_operation USING ps_order
+                          CHANGING lv_vornr.
+
+  "Prepare output record
+  PERFORM f_prepare_output USING ps_order lv_vornr lv_stat.
+
+ENDFORM.                    " f_check_status
+
+*---------------------------------------------------------------------*
+* Get first valid operation
+*---------------------------------------------------------------------*
+FORM f_get_operation USING    ps_order TYPE viaufkst
+                     CHANGING pv_vornr TYPE afvc-vornr.
+
+  DATA: lv_aufpl TYPE afvc-aufpl,
+        lv_aplzl TYPE afvc-aplzl,
+        lv_objnr TYPE jest-objnr,
+        lv_stat  TYPE jstat.
+
+  "Step 1: Get first operation
+  SELECT vornr, aufpl, aplzl, objnr
+    FROM afvc
+    WHERE aufpl = @ps_order-aufpl
+    ORDER BY aplzl
+    INTO @DATA(ls_afvc)
+    UP TO 1 ROWS.
+    ENDSELECT.
+
+    IF sy-subrc = 0.
+      pv_vornr = ls_afvc-vornr.
+      lv_aufpl = ls_afvc-aufpl.
+      lv_aplzl = ls_afvc-aplzl.
+      lv_objnr = ls_afvc-objnr.
+    ENDIF.
+
+    "Step 2: Skip deleted operation (status I0013)
+    IF sy-subrc = 0 AND lv_objnr IS NOT INITIAL.
+      SELECT SINGLE stat
+        INTO @lv_stat
+        FROM jest
+       WHERE objnr = @lv_objnr
+         AND stat  = 'I0013'
+         AND inact = ''.
+
+      IF sy-subrc = 0.
+        CLEAR pv_vornr.
+      ENDIF.
+    ENDIF.
+
+ENDFORM.                    " f_get_operation
+
+*---------------------------------------------------------------------*
+* Prepare output line depending on case
+*---------------------------------------------------------------------*
+FORM f_prepare_output USING ps_order TYPE viaufkst
+                            pv_vornr TYPE vornr
+                            pv_stat  TYPE jstat.
+
+  CLEAR gs_output.
+  gs_output-aufnr   = ps_order-aufnr.
+  gs_output-vornr   = pv_vornr.
+  gs_output-gstrp   = ps_order-gstrp.
+  gs_output-gltrp   = ps_order-gltrp.
+  gs_output-lacdate = ps_order-lacd_date.
+
+  "Case mapping
+  CASE pv_stat.
+    WHEN c_stat_rel.
+      gs_output-stat_txt = 'Released'.
+    WHEN c_stat_teco.
+      gs_output-stat_txt = 'Technically Completed'.
+    WHEN c_stat_lkd.
+      "Check lock/unlock
+      SELECT SINGLE inact
+        FROM jest
+       WHERE objnr = @ps_order-objnr
+         AND stat = @c_stat_lkd
+       INTO @DATA(lv_inact).
+        IF lv_inact IS INITIAL.
+          gs_output-stat_txt = 'Locked'.
+        ELSE.
+          gs_output-stat_txt = 'Released'.
+        ENDIF.
+    ENDCASE.
+
+    "Object (equipment or location)
+    IF ps_order-equnr IS NOT INITIAL.
+      gs_output-obj_txt = ps_order-equnr.
+    ELSE.
+      gs_output-obj_txt = ps_order-tplnr.
+    ENDIF.
+
+    APPEND gs_output TO gt_output.
+
+ENDFORM.                    " f_prepare_output
+
+*---------------------------------------------------------------------*
+* Send orders to CMX (update user status)
+*---------------------------------------------------------------------*
+FORM f_send_cmx.
+
+  IF p_test = 'X'.
+    RETURN. "Test mode, no update
+  ENDIF.
+
+  LOOP AT gt_output INTO gs_output.
+    DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
+          lt_status TYPE TABLE OF BAPI_ALM_ORDER_USRSTAT,
+          ls_header TYPE bapi_alm_order_headers_i,
+          ls_status TYPE BAPI_ALM_ORDER_USRSTAT,
+          lt_return TYPE TABLE OF bapiret2,
+          ls_return TYPE bapiret2.
+
+    CLEAR: lt_header, lt_status.
+
+    ls_header-orderid = gs_output-aufnr.
+    APPEND ls_header TO lt_header.
+
+    ls_status-user_st_text = 'CMXS'.
+    ls_status-langu        = 'EN'.
+    ls_status-langu_iso    = 'E'.
+    APPEND ls_status TO lt_status.
+
+    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
+      TABLES
+        it_header     = lt_header
+        it_userstatus = lt_status
+        return        = lt_return.
+
+    READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
+    IF sy-subrc = 0.
+      gs_output-msg = ls_return-message.
+      MODIFY gt_output FROM gs_output.
+    ENDIF.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = 'X'.
+  ENDLOOP.
+
+ENDFORM.                    " f_send_cmx
+
+*---------------------------------------------------------------------*
+* Display ALV Output
+*---------------------------------------------------------------------*
+FORM f_display.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_structure_name = 'TY_OUTPUT'
+    TABLES
+      t_outtab         = gt_output.
+
+ENDFORM.                    " f_display
