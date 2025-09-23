@@ -1,7 +1,3 @@
-*&---------------------------------------------------------------------*
-*& Include          ZIN_CMX_WORKORDER_TOP
-*&---------------------------------------------------------------------*
-
 CONSTANTS: c_stat_rel  TYPE jest-stat VALUE 'I0002',   "Released
            c_stat_teco TYPE jest-stat VALUE 'I0045',   "Technically Completed
            c_stat_lkd  TYPE jest-stat VALUE 'I0043',   "Locked
@@ -9,19 +5,22 @@ CONSTANTS: c_stat_rel  TYPE jest-stat VALUE 'I0002',   "Released
            c_stat_cmxs TYPE jest-stat VALUE 'E0014'.   "Sent to CMX
 
 TYPES: BEGIN OF ty_output,
-         aufnr    TYPE aufnr,       "Order Number
-         vornr    TYPE vornr,       "Operation Number
-         stat_txt TYPE char20,      "Order Status Text (REL, TECO, LKD…)
-         obj_txt  TYPE char30,      "Equipment or Functional Location
-         gstrp    TYPE viaufkst-gstrp,       "Basic Start Date
-         gltrp    TYPE viaufkst-gltrp,       "Basic End Date
-         lacdate  TYPE viaufkst-lacd_date,   "Final Due Date
-         msg      TYPE char72,      "Error Message if any
+         order_msg_status TYPE char10,              "OrderMessageStatus
+         aufnr            TYPE aufnr,               "MaintenaceOrder
+         vornr            TYPE vornr,               "MaintenanceOrderOperation
+         stat_txt         TYPE char20,              "SystemStatusText
+         obj_txt          TYPE char30,              "TechnicalObjective
+         gstrp            TYPE viaufkst-gstrp,      "MaintOrdBasicStartDate
+         gltrp            TYPE viaufkst-gltrp,      "MaintOrdBasicEndDate
+         lacdate          TYPE viaufkst-lacd_date,  "LatestAcceptableComplDate
+         sysid            TYPE sy-sysid,            "SystemId
+         msg              TYPE char72,              "Error Message
        END OF ty_output.
 
 DATA: gt_output TYPE TABLE OF ty_output,
       gs_output TYPE ty_output.
+
 DATA: gt_orders TYPE TABLE OF viaufkst,
-      gs_order TYPE viaufkst.
+      gs_order  TYPE viaufkst.
 
 DATA: gv_atinn TYPE atinn.   "INTERFACE characteristic ID
