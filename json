@@ -1,0 +1,13 @@
+[
+  {
+    "OrderMessageStatus": "CREATE",
+    "MaintenaceOrder": 000060000122,
+    "MaintenanceOrderOperation": 0020,
+    "SystemStatusText": "REL",
+    "TechnicalObjective": "Y11-F6-SC21111",
+    "MaintOrdBasicStartDate": 20250911,
+    "MaintOrdBasicEndDate": 20250911,
+    "LatestAcceptableComplDate": 20260906,
+    "SystemId": "T30"
+  },
+ ]
