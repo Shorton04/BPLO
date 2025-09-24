@@ -30,6 +30,10 @@ END-OF-SELECTION.
     PERFORM f_display.           "Show ALV
     PERFORM f_send_cmx.          "Update user status in SAP
     PERFORM f_send_to_cpi.       "Send JSON payload to CPI
+
+    IF p_test IS INITIAL.
+      PERFORM f_update_run_log.  "Save last run date/time
+    ENDIF.
   ELSE.
     WRITE: / 'No matching orders found.'.
   ENDIF.
