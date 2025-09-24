@@ -269,3 +269,25 @@ FORM f_update_run_log.
   COMMIT WORK.
 
 ENDFORM.
+
+
+
+
+
+
+FORM f_update_run_log.
+
+  DATA(ls_log) = VALUE zcmx_run_log(
+                    prog         = 'ZIN_CMX_WORKORDER'
+                    last_run_date = sy-datum
+                    last_run_time = sy-uzeit ).
+
+  MODIFY zcmx_run_log FROM ls_log.
+
+  IF sy-subrc <> 0.
+    INSERT zcmx_run_log FROM ls_log.
+  ENDIF.
+
+  COMMIT WORK.
+
+ENDFORM.
