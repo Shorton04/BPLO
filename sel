@@ -18,26 +18,11 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
 SELECTION-SCREEN END OF BLOCK b1.
 
 INITIALIZATION.
-  "Default from ZCMX_RUN_LOG if available
-  DATA: ls_run_log TYPE zcmx_run_log.
-
-  SELECT SINGLE last_run_date last_run_time
-    INTO (ls_run_log-last_run_date, ls_run_log-last_run_time)
-    FROM zcmx_run_log
-   WHERE prog = 'ZIN_CMX_WORKORDER'.
-
-  IF sy-subrc = 0.
-    so_date-low = ls_run_log-last_run_date.
-    so_date-high = ls_run_log-last_run_date.
-    so_time-low = ls_run_log-last_run_time.
-    so_time-high = ls_run_log-last_run_time.
-  ELSE.
-    so_date-low = sy-datum.
-    so_date-high = sy-datum.
-    so_time-low = sy-uzeit.
-    so_time-high = sy-uzeit.
-  ENDIF.
-
+  " Default to current date/time if no run log table used
+  so_date-low = sy-datum.
+  so_date-high = sy-datum.
+  so_time-low = sy-uzeit.
+  so_time-high = sy-uzeit.
   so_date-sign = 'I'.
   so_date-option = 'EQ'.
   APPEND so_date.
