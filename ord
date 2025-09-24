@@ -29,7 +29,7 @@ END-OF-SELECTION.
   IF gt_output IS NOT INITIAL.
     PERFORM f_display.           "Show ALV
     PERFORM f_send_cmx.          "Update user status in SAP
-    PERFORM f_send_to_cpi.       "NEW: Send JSON payload to CPI
+    PERFORM f_send_to_cpi.       "Send JSON payload to CPI
   ELSE.
     WRITE: / 'No matching orders found.'.
   ENDIF.
