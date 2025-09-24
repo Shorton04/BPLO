@@ -1,3 +1,7 @@
+*&---------------------------------------------------------------------*
+*& Include          ZIN_CMX_WORKORDER_TOP
+*&---------------------------------------------------------------------*
+
 CONSTANTS: c_stat_rel  TYPE jest-stat VALUE 'I0002',   "Released
            c_stat_teco TYPE jest-stat VALUE 'I0045',   "Technically Completed
            c_stat_lkd  TYPE jest-stat VALUE 'I0043',   "Locked
