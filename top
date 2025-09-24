@@ -5,18 +5,19 @@
 CONSTANTS: c_stat_rel  TYPE jest-stat VALUE 'I0002',   "Released
            c_stat_teco TYPE jest-stat VALUE 'I0045',   "Technically Completed
            c_stat_lkd  TYPE jest-stat VALUE 'I0043',   "Locked
-           c_stat_cmxc TYPE jest-stat VALUE 'E0010',   "CMX Confirmed (skip)
+           c_stat_cmxc TYPE jest-stat VALUE 'E0010',   "CMX Confirmed
            c_stat_cmxs TYPE jest-stat VALUE 'E0014'.   "Sent to CMX
 
 TYPES: BEGIN OF ty_output,
          order_msg_status TYPE char10,              "OrderMessageStatus
-         aufnr            TYPE aufnr,               "MaintenaceOrder
+         werks            TYPE werks_d,             "Plant
+         aufnr            TYPE aufnr,               "MaintenanceOrder
          vornr            TYPE vornr,               "MaintenanceOrderOperation
-         stat_txt         TYPE char20,              "SystemStatusText
-         obj_txt          TYPE char30,              "TechnicalObjective
-         gstrp            TYPE viaufkst-gstrp,      "MaintOrdBasicStartDate
-         gltrp            TYPE viaufkst-gltrp,      "MaintOrdBasicEndDate
-         lacdate          TYPE viaufkst-lacd_date,  "LatestAcceptableComplDate
+         stat_txt         TYPE char40,              "SystemStatusText
+         obj_txt          TYPE char30,              "TechnicalObject
+         gstrp            TYPE viaufkst-gstrp,      "Basic Start Date
+         gltrp            TYPE viaufkst-gltrp,      "Basic End Date
+         lacdate          TYPE viaufkst-lacd_date,  "Latest Acceptable Date
          sysid            TYPE sy-sysid,            "SystemId
          msg              TYPE char72,              "Error Message
        END OF ty_output.
