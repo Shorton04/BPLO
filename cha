@@ -1,87 +1,43 @@
-FORM f_send_to_cpi.
-  DATA: lv_payload    TYPE string,
-        lv_content    TYPE string VALUE 'application/json',
-        lv_rfc        TYPE rfcdest VALUE 'CMX_WorkOrder',
-        lv_status     TYPE i,
-        lv_status_c   TYPE char10,
-        lv_response   TYPE string.
+FORM f_send_cmx.
+  DATA ls_output LIKE LINE OF gt_output.
 
-  " Build JSON payload
-  TRY.
-      lv_payload = xco_ku_json=>data->from_abap( gt_output )->to_string( ).
-    CATCH cx_sxml_error INTO DATA(lx_error).
-      LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
-        <ls_output_row>-msg = |JSON build failed: { lx_error->get_text( ) }|.
-        PERFORM f_write_log USING <ls_output_row>-aufnr
-                                   <ls_output_row>-vornr
-                                   <ls_output_row>-werks
-                                   'CMXS'
-                                   <ls_output_row>-msg.
-      ENDLOOP.
-      RETURN.
-  ENDTRY.
+  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
+    DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
+          lt_status TYPE TABLE OF bapi_alm_order_usrstat,
+          ls_header TYPE bapi_alm_order_headers_i,
+          ls_status TYPE bapi_alm_order_usrstat,
+          lt_return TYPE TABLE OF bapiret2,
+          ls_return TYPE bapiret2.
 
-  " Create HTTP client
-  cl_http_client=>create_by_destination(
-    EXPORTING destination = lv_rfc
-    IMPORTING client      = DATA(lo_http_client)
-    EXCEPTIONS OTHERS     = 1 ).
-  IF sy-subrc <> 0.
-    LOOP AT gt_output ASSIGNING <ls_output_row>.
-      <ls_output_row>-msg = 'HTTP client creation failed'.
-      PERFORM f_write_log USING <ls_output_row>-aufnr
-                                 <ls_output_row>-vornr
-                                 <ls_output_row>-werks
-                                 'CMXS'
-                                 <ls_output_row>-msg.
-    ENDLOOP.
-    RETURN.
-  ENDIF.
+    ls_header-orderid = <ls_output_row>-aufnr.
+    APPEND ls_header TO lt_header.
 
-  " HTTP headers + body
-  lo_http_client->request->set_header_field(
-    name  = '~request_method' value = 'POST' ).
-  lo_http_client->request->set_header_field(
-    name  = 'Content-Type' value = lv_content ).
-  lo_http_client->request->set_cdata( lv_payload ).
+    ls_status-user_st_text = 'CMXS'.
+    ls_status-langu        = 'EN'.
+    ls_status-langu_iso    = 'E'.
+    APPEND ls_status TO lt_status.
 
-  " Send + receive
-  TRY.
-      lo_http_client->send( ).
-      lo_http_client->receive( ).
-    CATCH cx_root INTO DATA(lx_comm_error).
-      LOOP AT gt_output ASSIGNING <ls_output_row>.
-        <ls_output_row>-msg = |HTTP communication error: { lx_comm_error->get_text( ) }|.
-        PERFORM f_write_log USING <ls_output_row>-aufnr
-                                   <ls_output_row>-vornr
-                                   <ls_output_row>-werks
-                                   'CMXS'
-                                   <ls_output_row>-msg.
-      ENDLOOP.
-      RETURN.
-  ENDTRY.
+    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
+      TABLES
+        it_header     = lt_header
+        it_userstatus = lt_status
+        return        = lt_return.
 
-  " Check status
-  lo_http_client->response->get_status( IMPORTING code = lv_status ).
-  WRITE lv_status TO lv_status_c.
-
-  " Get response body (for debugging CPI errors)
-  lv_response = lo_http_client->response->get_cdata( ).
-
-  " Log results
-  LOOP AT gt_output ASSIGNING <ls_output_row>.
-    IF lv_status = 200.
-      <ls_output_row>-msg = 'CPI success'.
-    ELSE.
-      <ls_output_row>-msg = |CPI error { lv_status_c }: { lv_response }|.
+    READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
+    IF sy-subrc = 0.
+      <ls_output_row>-msg = ls_return-message.
     ENDIF.
 
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = 'X'.
+
+    " Log entry
     PERFORM f_write_log USING <ls_output_row>-aufnr
                                <ls_output_row>-vornr
                                <ls_output_row>-werks
                                'CMXS'
                                <ls_output_row>-msg.
-  ENDLOOP.
 
-  COMMIT WORK.  " Ensure logs are saved
+  ENDLOOP.
 ENDFORM.
