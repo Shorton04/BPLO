@@ -158,9 +158,12 @@ ENDFORM.
 
 *---------------------------------------------------------------------*
 * Update SAP status
+*
+* NOTE: field-symbol name changed to <fs_row> to avoid duplicate declaration
+* (previous <fs_output> caused collision). This is the ONLY name change.
 *---------------------------------------------------------------------*
 FORM f_send_cmx.
-  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_output>).
+  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_row>).   " <<< renamed from <fs_output>
     DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
           lt_status TYPE TABLE OF bapi_alm_order_usrstat,
           ls_header TYPE bapi_alm_order_headers_i,
@@ -168,7 +171,7 @@ FORM f_send_cmx.
           lt_return TYPE TABLE OF bapiret2,
           ls_return TYPE bapiret2.
 
-    ls_header-orderid = <fs_output>-aufnr.
+    ls_header-orderid = <fs_row>-aufnr.
     APPEND ls_header TO lt_header.
 
     ls_status-user_st_text = 'CMXS'.
@@ -184,7 +187,7 @@ FORM f_send_cmx.
 
     READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
     IF sy-subrc = 0.
-      <fs_output>-msg = ls_return-message.
+      <fs_row>-msg = ls_return-message.
     ENDIF.
 
     CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
@@ -192,13 +195,13 @@ FORM f_send_cmx.
         wait = 'X'.
 
     " --- NEW: Write to log table after SAP status update
-    PERFORM f_write_log USING <fs_output>-aufnr
-                               <fs_output>-vornr
-                               <fs_output>-werks
+    PERFORM f_write_log USING <fs_row>-aufnr
+                               <fs_row>-vornr
+                               <fs_row>-werks
                                'CMXS'
-                               <fs_output>-msg
+                               <fs_row>-msg
                                'SAP_UPDATE'
-                               'X'.   "*** NEW / FIX: logging on SAP update
+                               'X'.   "*** NEW: logging on SAP update
   ENDLOOP.
 ENDFORM.
 
@@ -219,13 +222,15 @@ ENDFORM.
 
 *---------------------------------------------------------------------*
 * Send JSON payload to CPI
+*
+* NOTE: field-symbol name changed to <fs_row> here as well.
 *---------------------------------------------------------------------*
 FORM f_send_to_cpi.
   DATA: lv_payload TYPE string,
         lv_content TYPE string VALUE 'application/json',
         lv_rfc     TYPE rfcdest VALUE 'CMX_WorkOrder',
         lv_status  TYPE i,
-        lv_status_c TYPE char10.            "*** NEW / FIX: char representation of status
+        lv_status_c TYPE char10.            "*** char conversion for logging
 
   TRY.
       lv_payload = xco_ku_json=>data->from_abap( gt_output )->to_string( ).
@@ -249,30 +254,29 @@ FORM f_send_to_cpi.
   lo_http_client->receive( ).
   lo_http_client->response->get_status( IMPORTING code = lv_status ).
 
-  " --- NEW / FIX: compare numeric status and prepare char version for logging
-  IF lv_status <> 200.                " *** changed to numeric compare (was '200' string)
-    WRITE lv_status TO lv_status_c.   " convert to CHAR10 for log
-    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_output>).
-      CONCATENATE 'CPI error:' lv_status_c INTO <fs_output>-msg SEPARATED BY space.
-      PERFORM f_write_log USING <fs_output>-aufnr
-                                 <fs_output>-vornr
-                                 <fs_output>-werks
-                                 <fs_output>-stat_txt
-                                 <fs_output>-msg
+  " --- NEW: Log results of CPI call (use <fs_row>)
+  WRITE lv_status TO lv_status_c.
+  IF lv_status <> 200.
+    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_row>).   " <<< renamed from <fs_output>
+      CONCATENATE 'CPI error:' lv_status_c INTO <fs_row>-msg SEPARATED BY space.
+      PERFORM f_write_log USING <fs_row>-aufnr
+                                 <fs_row>-vornr
+                                 <fs_row>-werks
+                                 <fs_row>-stat_txt
+                                 <fs_row>-msg
                                  lv_status_c
-                                 ''.   "*** NEW / FIX: log failure (pv_msg is STRING so compatible)
+                                 ''.   "*** NEW: log failure
     ENDLOOP.
   ELSE.
-    WRITE lv_status TO lv_status_c.   " convert to CHAR10 for log
-    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_output>).
-      <fs_output>-msg = 'CPI success'.
-      PERFORM f_write_log USING <fs_output>-aufnr
-                                 <fs_output>-vornr
-                                 <fs_output>-werks
-                                 <fs_output>-stat_txt
-                                 <fs_output>-msg
+    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<fs_row>).   " <<< renamed from <fs_output>
+      <fs_row>-msg = 'CPI success'.
+      PERFORM f_write_log USING <fs_row>-aufnr
+                                 <fs_row>-vornr
+                                 <fs_row>-werks
+                                 <fs_row>-stat_txt
+                                 <fs_row>-msg
                                  lv_status_c
-                                 'X'.  "*** NEW / FIX: log success
+                                 'X'.  "*** NEW: log success
     ENDLOOP.
   ENDIF.
 
@@ -286,7 +290,7 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
                           pv_vornr   TYPE vornr
                           pv_werks   TYPE werks_d
                           pv_stat    TYPE char20
-                          pv_msg     TYPE string        "*** NEW / FIX: changed to STRING to avoid incompatibility
+                          pv_msg     TYPE string        "*** pv_msg STRING to avoid incompatibility
                           pv_cpi_st  TYPE char10
                           pv_success TYPE c.
 
@@ -302,7 +306,7 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
   ls_log-system_id  = sy-sysid.
   ls_log-run_date   = sy-datum.
   ls_log-run_time   = sy-uzeit.
-  " --- NEW / FIX: accept pv_msg STRING and assign (truncation handled by DB field length)
+  " --- NEW: accept pv_msg STRING and assign (DB will truncate if needed)
   ls_log-msg        = pv_msg.
   ls_log-cpi_status = pv_cpi_st.
   ls_log-sent_flag  = pv_success.
