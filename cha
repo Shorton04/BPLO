@@ -1,38 +1,4 @@
 *&---------------------------------------------------------------------*
-*& Include          ZIN_CMX_WORKORDER_TOP
-*&---------------------------------------------------------------------*
-
-CONSTANTS: c_stat_rel  TYPE jest-stat VALUE 'I0002',   "Released
-           c_stat_teco TYPE jest-stat VALUE 'I0045',   "Technically Completed
-           c_stat_lkd  TYPE jest-stat VALUE 'I0043',   "Locked
-           c_stat_cmxc TYPE jest-stat VALUE 'E0010',   "CMX Confirmed
-           c_stat_cmxs TYPE jest-stat VALUE 'E0014'.   "Sent to CMX
-
-TYPES: BEGIN OF ty_output,
-         order_msg_status TYPE char10,              "OrderMessageStatus
-         werks            TYPE werks_d,             "Plant
-         aufnr            TYPE aufnr,               "MaintenanceOrder
-         vornr            TYPE vornr,               "MaintenanceOrderOperation
-         stat_txt         TYPE char40,              "SystemStatusText
-         obj_txt          TYPE char30,              "TechnicalObject
-         gstrp            TYPE viaufkst-gstrp,      "Basic Start Date
-         gltrp            TYPE viaufkst-gltrp,      "Basic End Date
-         lacdate          TYPE viaufkst-lacd_date,  "Latest Acceptable Date
-         system_id        TYPE sy-sysid,            "SystemId (for CPI)
-         msg              TYPE char72,              "Error Message
-       END OF ty_output.
-
-DATA: gt_output TYPE TABLE OF ty_output,
-      gs_output TYPE ty_output.
-
-DATA: gt_orders TYPE TABLE OF viaufkst,
-      gs_order  TYPE viaufkst.
-
-DATA: gv_atinn TYPE atinn.   "INTERFACE characteristic ID
-
-
-
-*&---------------------------------------------------------------------*
 *& Include          ZIN_CMX_WORKORDER_F01
 *&---------------------------------------------------------------------*
 
@@ -196,7 +162,7 @@ ENDFORM.
 FORM f_send_cmx.
   DATA ls_output LIKE LINE OF gt_output.
 
-  LOOP AT gt_output INTO ls_output.
+  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
     DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
           lt_status TYPE TABLE OF bapi_alm_order_usrstat,
           ls_header TYPE bapi_alm_order_headers_i,
@@ -204,7 +170,7 @@ FORM f_send_cmx.
           lt_return TYPE TABLE OF bapiret2,
           ls_return TYPE bapiret2.
 
-    ls_header-orderid = ls_output-aufnr.
+    ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
     ls_status-user_st_text = 'CMXS'.
@@ -220,7 +186,7 @@ FORM f_send_cmx.
 
     READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
     IF sy-subrc = 0.
-      ls_output-msg = ls_return-message.
+      <ls_output_row>-msg = ls_return-message.
     ENDIF.
 
     CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
@@ -228,15 +194,12 @@ FORM f_send_cmx.
         wait = 'X'.
 
     " Log entry
-    PERFORM f_write_log USING ls_output-aufnr
-                               ls_output-vornr
-                               ls_output-werks
+    PERFORM f_write_log USING <ls_output_row>-aufnr
+                               <ls_output_row>-vornr
+                               <ls_output_row>-werks
                                'CMXS'
-                               ls_output-msg
-                               'SAP_UPDATE'
-                               'X'.
+                               <ls_output_row>-msg.
 
-    MODIFY gt_output FROM ls_output.
   ENDLOOP.
 ENDFORM.
 
@@ -292,28 +255,23 @@ FORM f_send_to_cpi.
   DATA ls_output LIKE LINE OF gt_output.
 
   IF lv_status <> 200.
-    LOOP AT gt_output INTO ls_output.
-      CONCATENATE 'CPI error:' lv_status_c INTO ls_output-msg SEPARATED BY space.
-      PERFORM f_write_log USING ls_output-aufnr
-                                 ls_output-vornr
-                                 ls_output-werks
-                                 ls_output-stat_txt
-                                 ls_output-msg
-                                 lv_status_c
-                                 ''.
-      MODIFY gt_output FROM ls_output.
+    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
+      CONCATENATE 'CPI error:' lv_status_c INTO <ls_output_row>-msg SEPARATED BY space.
+      PERFORM f_write_log USING <ls_output_row>-aufnr
+                                 <ls_output_row>-vornr
+                                 <ls_output_row>-werks
+                                 'CMXS'
+                                 <ls_output_row>-msg.
     ENDLOOP.
   ELSE.
-    LOOP AT gt_output INTO ls_output.
-      ls_output-msg = 'CPI success'.
-      PERFORM f_write_log USING ls_output-aufnr
-                                 ls_output-vornr
-                                 ls_output-werks
-                                 ls_output-stat_txt
-                                 ls_output-msg
-                                 lv_status_c
-                                 'X'.
-      MODIFY gt_output FROM ls_output.
+    LOOP AT gt_output ASSIGNING <ls_output_row>.
+      <ls_output_row>-msg = 'CPI success'.
+      PERFORM f_write_log USING <ls_output_row>-aufnr
+                                 <ls_output_row>-vornr
+                                 <ls_output_row>-werks
+                                 'CMXS'
+                                 <ls_output_row>-msg.
+
     ENDLOOP.
   ENDIF.
 
@@ -326,9 +284,7 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
                           pv_vornr   TYPE vornr
                           pv_werks   TYPE werks_d
                           pv_stat    TYPE char20
-                          pv_msg     TYPE string
-                          pv_cpi_st  TYPE char10
-                          pv_success TYPE c.
+                          pv_msg     TYPE char72.
 
   DATA: ls_log TYPE zcmx_run_log.
 
@@ -343,8 +299,6 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
   ls_log-run_date   = sy-datum.
   ls_log-run_time   = sy-uzeit.
   ls_log-msg        = pv_msg.
-  ls_log-cpi_status = pv_cpi_st.
-  ls_log-sent_flag  = pv_success.
   ls_log-created_by = sy-uname.
 
   INSERT zcmx_run_log FROM ls_log.
