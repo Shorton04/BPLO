@@ -18,7 +18,7 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
 SELECTION-SCREEN END OF BLOCK b1.
 
 INITIALIZATION.
-  " Default to current date/time if no run log table used
+  " Default to current date/time
   so_date-low = sy-datum.
   so_date-high = sy-datum.
   so_time-low = sy-uzeit.
