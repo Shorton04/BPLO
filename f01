@@ -126,7 +126,7 @@ FORM f_prepare_output USING ps_order TYPE viaufkst
   gs_output-gstrp   = ps_order-gstrp.
   gs_output-gltrp   = ps_order-gltrp.
   gs_output-lacdate = ps_order-lacd_date.
-  gs_output-sysid   = sy-sysid.
+  gs_output-system_id = sy-sysid.  " <-- ensure CPI receives SystemId
 
   SELECT SINGLE txt04 INTO gs_output-stat_txt
     FROM tj02t
