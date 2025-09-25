@@ -1,5 +1,6 @@
 FORM f_send_cmx.
-  DATA ls_output LIKE LINE OF gt_output.
+  DATA: ls_output LIKE LINE OF gt_output,
+        lv_msg    TYPE string.
 
   LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
     DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
@@ -9,30 +10,56 @@ FORM f_send_cmx.
           lt_return TYPE TABLE OF bapiret2,
           ls_return TYPE bapiret2.
 
+    CLEAR: lt_header, lt_status, lt_return.
+
+    " Set header
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
+    " Set user status
     ls_status-user_st_text = 'CMXS'.
     ls_status-langu        = 'EN'.
     ls_status-langu_iso    = 'E'.
     APPEND ls_status TO lt_status.
 
+    " Call BAPI with error handling
     CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
       TABLES
         it_header     = lt_header
         it_userstatus = lt_status
-        return        = lt_return.
+        return        = lt_return
+      EXCEPTIONS
+        OTHERS        = 1.
 
-    READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
-    IF sy-subrc = 0.
-      <ls_output_row>-msg = ls_return-message.
+    IF sy-subrc <> 0.
+      lv_msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
+      <ls_output_row>-msg = lv_msg.
+    ELSE.
+      " Check return messages
+      READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
+      IF sy-subrc = 0.
+        lv_msg = ls_return-message.
+      ELSE.
+        READ TABLE lt_return INTO ls_return WITH KEY type = 'W'.
+        IF sy-subrc = 0.
+          lv_msg = |Warning: { ls_return-message }|.
+        ELSE.
+          lv_msg = 'CMXS status updated successfully'.
+        ENDIF.
+      ENDIF.
+
+      <ls_output_row>-msg = lv_msg.
+
+      " Commit only if no error
+      IF lv_msg CS 'success' OR lv_msg CS 'Warning'.
+        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+          EXPORTING wait = 'X'.
+      ELSE.
+        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+      ENDIF.
     ENDIF.
 
-    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
-      EXPORTING
-        wait = 'X'.
-
-    " Log entry
+    " Always log result
     PERFORM f_write_log USING <ls_output_row>-aufnr
                                <ls_output_row>-vornr
                                <ls_output_row>-werks
@@ -40,4 +67,6 @@ FORM f_send_cmx.
                                <ls_output_row>-msg.
 
   ENDLOOP.
+
+  COMMIT WORK. " Persist log entries
 ENDFORM.
