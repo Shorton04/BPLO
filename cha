@@ -1,65 +1,61 @@
 FORM f_send_cmx.
-  DATA: ls_output LIKE LINE OF gt_output,
-        lv_msg    TYPE string.
+  DATA ls_output LIKE LINE OF gt_output.
 
   LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
-    DATA: lt_header TYPE TABLE OF bapi_alm_order_headers_i,
-          lt_status TYPE TABLE OF bapi_alm_order_usrstat,
-          ls_header TYPE bapi_alm_order_headers_i,
-          ls_status TYPE bapi_alm_order_usrstat,
-          lt_return TYPE TABLE OF bapiret2,
-          ls_return TYPE bapiret2.
+    DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
+          lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
+          lt_methods TYPE TABLE OF bapi_alm_order_method,
+          ls_header  TYPE bapi_alm_order_headers_i,
+          ls_status  TYPE bapi_alm_order_usrstat,
+          ls_method  TYPE bapi_alm_order_method,
+          lt_return  TYPE TABLE OF bapiret2,
+          ls_return  TYPE bapiret2.
 
-    CLEAR: lt_header, lt_status, lt_return.
+    CLEAR: lt_header, lt_status, lt_methods, lt_return.
 
-    " Set header
+    " Header
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
-    " Set user status
+    " User status
     ls_status-user_st_text = 'CMXS'.
     ls_status-langu        = 'EN'.
     ls_status-langu_iso    = 'E'.
     APPEND ls_status TO lt_status.
 
-    " Call BAPI with error handling
+    " Method for user status
+    ls_method-refnumber = '000001'.
+    ls_method-objecttype = 'HEADER'.
+    ls_method-method     = 'USERSTATUS'.
+    ls_method-objectkey  = <ls_output_row>-aufnr.
+    APPEND ls_method TO lt_methods.
+
+    " Call BAPI
     CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
       TABLES
         it_header     = lt_header
+        it_methods    = lt_methods
         it_userstatus = lt_status
         return        = lt_return
       EXCEPTIONS
         OTHERS        = 1.
 
     IF sy-subrc <> 0.
-      lv_msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
-      <ls_output_row>-msg = lv_msg.
+      <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
     ELSE.
-      " Check return messages
+      " Check messages
       READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
       IF sy-subrc = 0.
-        lv_msg = ls_return-message.
+        <ls_output_row>-msg = ls_return-message.
+        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
       ELSE.
-        READ TABLE lt_return INTO ls_return WITH KEY type = 'W'.
-        IF sy-subrc = 0.
-          lv_msg = |Warning: { ls_return-message }|.
-        ELSE.
-          lv_msg = 'CMXS status updated successfully'.
-        ENDIF.
-      ENDIF.
-
-      <ls_output_row>-msg = lv_msg.
-
-      " Commit only if no error
-      IF lv_msg CS 'success' OR lv_msg CS 'Warning'.
+        <ls_output_row>-msg = 'CMXS status updated successfully'.
         CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
           EXPORTING wait = 'X'.
-      ELSE.
-        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
       ENDIF.
     ENDIF.
 
-    " Always log result
+    " Always log
     PERFORM f_write_log USING <ls_output_row>-aufnr
                                <ls_output_row>-vornr
                                <ls_output_row>-werks
@@ -68,5 +64,5 @@ FORM f_send_cmx.
 
   ENDLOOP.
 
-  COMMIT WORK. " Persist log entries
+  COMMIT WORK.
 ENDFORM.
