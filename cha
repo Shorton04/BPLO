@@ -19,7 +19,7 @@ TYPES: BEGIN OF ty_output,
          gltrp            TYPE viaufkst-gltrp,      "Basic End Date
          lacdate          TYPE viaufkst-lacd_date,  "Latest Acceptable Date
          system_id        TYPE sy-sysid,            "SystemId (for CPI)
-         msg              TYPE char72,              "Error Message
+         msg              TYPE zmsg_txt,            "Error Message (255, matches DB)
        END OF ty_output.
 
 DATA: gt_output TYPE TABLE OF ty_output,
