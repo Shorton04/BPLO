@@ -1,38 +1,73 @@
-*&---------------------------------------------------------------------*
-*& Report ZIN_CMX_WORKORDER
-*&---------------------------------------------------------------------*
-REPORT zin_cmx_workorder.
+*---------------------------------------------------------------------*
+* Update SAP status (CMXS)
+*---------------------------------------------------------------------*
+FORM f_send_cmx.
+  DATA: ls_output TYPE ty_output,
+        lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
+        lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
+        lt_methods TYPE TABLE OF bapi_alm_order_method,
+        lt_return  TYPE TABLE OF bapiret2,
+        ls_status  TYPE bapi_alm_order_usrstat,
+        ls_header  TYPE bapi_alm_order_headers_i,
+        ls_method  TYPE bapi_alm_order_method,
+        ls_return  TYPE bapiret2.
 
-*----------------------------------------------------------------------*
-*                           Includes                                   *
-*----------------------------------------------------------------------*
-INCLUDE zin_cmx_workorder_sel.
-INCLUDE zin_cmx_workorder_top.
-INCLUDE zin_cmx_workorder_f01.
+  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
 
-*-------------------------------------------------------------*
-*  START-OF-SELECTION
-*-------------------------------------------------------------*
-START-OF-SELECTION.
+    CLEAR: lt_header, lt_status, lt_methods, lt_return.
 
-  PERFORM f_get_orders.          "Fetch orders
+    " Header
+    CLEAR ls_header.
+    ls_header-orderid = <ls_output_row>-aufnr.
+    APPEND ls_header TO lt_header.
 
-  LOOP AT gt_orders INTO gs_order.
-    PERFORM f_check_status USING gs_order.
+    " User status (must use USER_ST, not USER_ST_TEXT!)
+    CLEAR ls_status.
+    ls_status-orderid = <ls_output_row>-aufnr.
+    ls_status-user_st = 'E0014'.   " CMXS internal code from TJ30
+    APPEND ls_status TO lt_status.
+
+    " Method for user status
+    CLEAR ls_method.
+    ls_method-refnumber  = '000001'.
+    ls_method-objecttype = 'HEADER'.
+    ls_method-method     = 'USERSTATUS'.
+    ls_method-objectkey  = <ls_output_row>-aufnr.
+    APPEND ls_method TO lt_methods.
+
+    " Call BAPI
+    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
+      TABLES
+        it_header     = lt_header
+        it_methods    = lt_methods
+        it_userstatus = lt_status
+        return        = lt_return
+      EXCEPTIONS
+        OTHERS        = 1.
+
+    IF sy-subrc <> 0.
+      <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
+    ELSE.
+      READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
+      IF sy-subrc = 0.
+        <ls_output_row>-msg = ls_return-message.
+        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+      ELSE.
+        <ls_output_row>-msg = 'CMXS status updated successfully'.
+        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+          EXPORTING
+            wait = 'X'.
+      ENDIF.
+    ENDIF.
+
+    " Always log
+    PERFORM f_write_log USING <ls_output_row>-aufnr
+                               <ls_output_row>-vornr
+                               <ls_output_row>-werks
+                               'CMXS'
+                               <ls_output_row>-msg.
+
   ENDLOOP.
 
-*-------------------------------------------------------------*
-*  END-OF-SELECTION
-*-------------------------------------------------------------*
-END-OF-SELECTION.
-
-  IF gt_output IS NOT INITIAL.
-    IF p_test EQ abap_true.
-      PERFORM f_display.         "Show ALV in test mode
-    ELSE.
-      PERFORM f_send_to_cpi.     "Send JSON to CPI
-      PERFORM f_send_cmx.        "Update SAP user status
-    ENDIF.
-  ELSE.
-    WRITE: / 'No matching orders found.'.
-  ENDIF.
+  COMMIT WORK.
+ENDFORM.
