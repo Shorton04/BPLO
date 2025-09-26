@@ -1,129 +1,10 @@
 *---------------------------------------------------------------------*
-* Write entry to ZCMX_RUN_LOG
-*---------------------------------------------------------------------*
-FORM f_write_log USING    pv_aufnr   TYPE aufnr
-                          pv_vornr   TYPE vornr
-                          pv_werks   TYPE werks_d
-                          pv_stat    TYPE char20
-                          pv_msg     TYPE char255.
-
-  DATA: ls_log TYPE zcmx_run_log.
-
-  CLEAR ls_log.
-  CONCATENATE sy-datum sy-uzeit sy-uname INTO ls_log-logid.
-  ls_log-mandt      = sy-mandt.
-  ls_log-aufnr      = pv_aufnr.
-  ls_log-vornr      = pv_vornr.
-  ls_log-werks      = pv_werks.
-  ls_log-stat       = pv_stat.
-  ls_log-system_id  = sy-sysid.
-  ls_log-run_date   = sy-datum.
-  ls_log-run_time   = sy-uzeit.
-  ls_log-msg        = pv_msg.
-  ls_log-created_by = sy-uname.
-
-  INSERT zcmx_run_log FROM ls_log.
-ENDFORM.
-
-
-
-
-*---------------------------------------------------------------------*
-* Update SAP status (now using work area, not field-symbols)
-*---------------------------------------------------------------------*
-FORM f_send_cmx.
-  DATA ls_output LIKE LINE OF gt_output.
-
-  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
-    DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
-          lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
-          lt_methods TYPE TABLE OF bapi_alm_order_method,
-          ls_header  TYPE bapi_alm_order_headers_i,
-          ls_status  TYPE bapi_alm_order_usrstat,
-          ls_method  TYPE bapi_alm_order_method,
-          lt_return  TYPE TABLE OF bapiret2,
-          ls_return  TYPE bapiret2.
-
-    CLEAR: lt_header, lt_status, lt_methods, lt_return.
-
-    " Header
-    ls_header-orderid = <ls_output_row>-aufnr.
-    APPEND ls_header TO lt_header.
-
-    " User status (using USER_ST_TEXT as you already had)
-    CLEAR ls_status.
-    ls_status-user_st_text = 'CMXS'.   " ensure this exists in your status profile
-    ls_status-langu        = sy-langu.
-    ls_status-langu_iso    = 'E'.
-    APPEND ls_status TO lt_status.
-
-    " Method for status update (STATUS is correct)
-    CLEAR ls_method.
-    ls_method-refnumber  = '000001'.
-    ls_method-objecttype = 'HEADER'.
-    ls_method-method     = 'STATUS'.    " use STATUS (not USERSTATUS)
-    ls_method-objectkey  = <ls_output_row>-aufnr.
-    APPEND ls_method TO lt_methods.
-
-    " Call BAPI
-    CLEAR lt_return.
-    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
-      TABLES
-        it_header     = lt_header
-        it_methods    = lt_methods
-        it_userstatus = lt_status
-        return        = lt_return
-      EXCEPTIONS
-        OTHERS        = 1.
-
-    IF sy-subrc <> 0.
-      <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
-      PERFORM f_write_log USING <ls_output_row>-aufnr
-                                 <ls_output_row>-vornr
-                                 <ls_output_row>-werks
-                                 'CMXS'
-                                 <ls_output_row>-msg.
-      CONTINUE.
-    ENDIF.
-
-    " If BAPI returned rows, build combined message (preserve detail)
-    DATA(lv_msg) = ''.
-    LOOP AT lt_return INTO ls_return.
-      CONCATENATE lv_msg ls_return-type ls_return-id ls_return-number ls_return-message
-                  INTO lv_msg SEPARATED BY ' - '.
-    ENDLOOP.
-
-    " If any error type E present, rollback, otherwise commit
-    READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
-    IF sy-subrc = 0.
-      <ls_output_row>-msg = |BAPI error: { lv_msg }|.
-      CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
-    ELSE.
-      <ls_output_row>-msg = |CMXS status updated: { lv_msg }|.
-      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' EXPORTING wait = 'X'.
-    ENDIF.
-
-    " Always log the result (use f_write_log which now accepts 255 chars)
-    PERFORM f_write_log USING <ls_output_row>-aufnr
-                               <ls_output_row>-vornr
-                               <ls_output_row>-werks
-                               'CMXS'
-                               <ls_output_row>-msg.
-
-  ENDLOOP.
-
-  COMMIT WORK.
-ENDFORM.
-
-
-
-
-
-
-*---------------------------------------------------------------------*
-* Display ALV (SALV) - robust and safe
+* Display ALV (SALV) - safe version
 *---------------------------------------------------------------------*
 FORM f_display.
+  DATA lx_notfound TYPE REF TO cx_salv_not_found.
+  DATA lx_salv_msg TYPE REF TO cx_salv_msg.
+
   " If no data, avoid calling SALV at all
   IF gt_output IS INITIAL.
     MESSAGE 'No orders to display' TYPE 'I'.
@@ -139,49 +20,48 @@ FORM f_display.
       lo_salv->get_columns( )->set_optimize( ).
       lo_salv->get_functions( )->set_all( ).
 
-      " Get columns object once
+      " Get columns object
       DATA(lo_columns) = lo_salv->get_columns( ).
 
-      " Safely try to set texts for columns that may or may not exist.
-      " If a column does not exist, cx_salv_not_found is raised and caught per TRY...ENDTRY.
+      " Add readable headers safely
       TRY.
           lo_columns->get_column( 'STAT_TXT' )->set_short_text( 'Status' ).
           lo_columns->get_column( 'STAT_TXT' )->set_medium_text( 'Order Status' ).
           lo_columns->get_column( 'STAT_TXT' )->set_long_text( 'Order Header Status' ).
-        CATCH cx_salv_not_found INTO DATA(lx_col).
-          " ignore missing column
+        CATCH cx_salv_not_found INTO lx_notfound.
+          " column missing, ignore
       ENDTRY.
 
       TRY.
           lo_columns->get_column( 'OBJ_TXT' )->set_short_text( 'Object' ).
           lo_columns->get_column( 'OBJ_TXT' )->set_medium_text( 'Technical Object' ).
           lo_columns->get_column( 'OBJ_TXT' )->set_long_text( 'Equipment/Location' ).
-        CATCH cx_salv_not_found INTO lx_col.
+        CATCH cx_salv_not_found INTO lx_notfound.
       ENDTRY.
 
       TRY.
           lo_columns->get_column( 'MSG' )->set_short_text( 'Message' ).
           lo_columns->get_column( 'MSG' )->set_medium_text( 'Error Text' ).
           lo_columns->get_column( 'MSG' )->set_long_text( 'Processing Message' ).
-        CATCH cx_salv_not_found INTO lx_col.
+        CATCH cx_salv_not_found INTO lx_notfound.
       ENDTRY.
 
       TRY.
           lo_columns->get_column( 'CPI_STATUS' )->set_short_text( 'CPI' ).
           lo_columns->get_column( 'CPI_STATUS' )->set_medium_text( 'CPI Status' ).
           lo_columns->get_column( 'CPI_STATUS' )->set_long_text( 'CPI Processing Status' ).
-        CATCH cx_salv_not_found INTO lx_col.
+        CATCH cx_salv_not_found INTO lx_notfound.
       ENDTRY.
 
       " Display ALV
       lo_salv->display( ).
 
-    CATCH cx_salv_not_found INTO DATA(lx_notfound).
-      " Defensive: report user-friendly message, do not dump
-      MESSAGE (lx_notfound->get_text( )) TYPE 'I'.
-    CATCH cx_salv_msg INTO DATA(lx_salv_msg).
-      " SALV-specific message, safe to handle
-      MESSAGE ( lx_salv_msg->get_text( ) ) TYPE 'I'.
+    CATCH cx_salv_not_found INTO lx_notfound.
+      MESSAGE lx_notfound->get_text( ) TYPE 'I'.
+
+    CATCH cx_salv_msg INTO lx_salv_msg.
+      MESSAGE lx_salv_msg->get_text( ) TYPE 'I'.
+
   ENDTRY.
 
 ENDFORM.
