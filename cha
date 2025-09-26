@@ -1,364 +1,1090 @@
-Here’s my code but when i test the sm59 it shown 500
+FUNCTION bapi_alm_order_maintain.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_MMSRV_EXTERNAL_MAINTENACE) TYPE  BAPI_FLAG OPTIONAL
+*"  TABLES
+*"      IT_METHODS STRUCTURE  BAPI_ALM_ORDER_METHOD
+*"      IT_HEADER STRUCTURE  BAPI_ALM_ORDER_HEADERS_I OPTIONAL
+*"      IT_HEADER_UP STRUCTURE  BAPI_ALM_ORDER_HEADERS_UP OPTIONAL
+*"      IT_HEADER_SRV STRUCTURE  BAPI_ALM_ORDER_SRVDAT_E OPTIONAL
+*"      IT_HEADER_SRV_UP STRUCTURE  BAPI_ALM_ORDER_SRVDAT_UP OPTIONAL
+*"      IT_USERSTATUS STRUCTURE  BAPI_ALM_ORDER_USRSTAT OPTIONAL
+*"      IT_PARTNER STRUCTURE  BAPI_ALM_ORDER_PARTN_MUL OPTIONAL
+*"      IT_PARTNER_UP STRUCTURE  BAPI_ALM_ORDER_PARTN_MUL_UP OPTIONAL
+*"      IT_OPERATION STRUCTURE  BAPI_ALM_ORDER_OPERATION OPTIONAL
+*"      IT_OPERATION_UP STRUCTURE  BAPI_ALM_ORDER_OPERATION_UP OPTIONAL
+*"      IT_RELATION STRUCTURE  BAPI_ALM_ORDER_RELATION OPTIONAL
+*"      IT_RELATION_UP STRUCTURE  BAPI_ALM_ORDER_RELATION_UP OPTIONAL
+*"      IT_COMPONENT STRUCTURE  BAPI_ALM_ORDER_COMPONENT OPTIONAL
+*"      IT_COMPONENT_UP STRUCTURE  BAPI_ALM_ORDER_COMPONENT_UP OPTIONAL
+*"      IT_OBJECTLIST STRUCTURE  BAPI_ALM_ORDER_OBJECTLIST OPTIONAL
+*"      IT_OBJECTLIST_UP STRUCTURE  BAPI_ALM_ORDER_OLIST_UP OPTIONAL
+*"      IT_OLIST_RELATION STRUCTURE  BAPI_ALM_OLIST_RELATION OPTIONAL
+*"      IT_TEXT STRUCTURE  BAPI_ALM_TEXT OPTIONAL
+*"      IT_TEXT_LINES STRUCTURE  BAPI_ALM_TEXT_LINES OPTIONAL
+*"      IT_SRULE STRUCTURE  BAPI_ALM_ORDER_SRULE OPTIONAL
+*"      IT_SRULE_UP STRUCTURE  BAPI_ALM_ORDER_SRULE_UP OPTIONAL
+*"      IT_TASKLISTS STRUCTURE  BAPI_ALM_ORDER_TASKLISTS_I OPTIONAL
+*"      EXTENSION_IN STRUCTURE  BAPIPAREX OPTIONAL
+*"      RETURN STRUCTURE  BAPIRET2 OPTIONAL
+*"      ET_NUMBERS STRUCTURE  BAPI_ALM_NUMBERS OPTIONAL
+*"      IT_REFORDER_ITEM STRUCTURE  BAPI_REFORDER_ITEM_I OPTIONAL
+*"      IT_REFORDER_ITEM_UP STRUCTURE  BAPI_REFORDER_ITEM_UP OPTIONAL
+*"      IT_REFORDER_SERNO_OLIST_INS STRUCTURE
+*"        BAPI_REFORDER_SERNO_OLIST_I OPTIONAL
+*"      IT_REFORDER_SERNO_OLIST_DEL STRUCTURE
+*"        BAPI_REFORDER_SERNO_OLIST_I OPTIONAL
+*"      IT_PRT STRUCTURE  BAPI_ALM_ORDER_PRT_I OPTIONAL
+*"      IT_PRT_UP STRUCTURE  BAPI_ALM_ORDER_PRT_UP OPTIONAL
+*"      IT_REFORDER_OPERATION STRUCTURE  BAPI_REFORDER_OPERATION
+*"       OPTIONAL
+*"      IT_SERVICEOUTLINE STRUCTURE  BAPI_ALM_SRV_OUTLINE OPTIONAL
+*"      IT_SERVICEOUTLINE_UP STRUCTURE  BAPI_ALM_SRV_OUTLINE_UP
+*"       OPTIONAL
+*"      IT_SERVICELINES STRUCTURE  BAPI_ALM_SRV_SERVICE_LINE OPTIONAL
+*"      IT_SERVICELINES_UP STRUCTURE  BAPI_ALM_SRV_SERVICE_LINE_UP
+*"       OPTIONAL
+*"      IT_SERVICELIMIT STRUCTURE  BAPI_ALM_SRV_LIMIT_DATA OPTIONAL
+*"      IT_SERVICELIMIT_UP STRUCTURE  BAPI_ALM_SRV_LIMIT_DATA_UP
+*"       OPTIONAL
+*"      IT_SERVICECONTRACTLIMITS STRUCTURE
+*"        BAPI_ALM_SRV_CONTRACT_LIMITS OPTIONAL
+*"      IT_SERVICECONTRACTLIMITS_UP STRUCTURE
+*"        BAPI_ALM_SRV_CONTRACT_LIMITS_U OPTIONAL
+*"      ET_NOTIFICATION_NUMBERS STRUCTURE  BAPI_ALM_NOTIF_NUMBERS
+*"       OPTIONAL
+*"      IT_PERMIT STRUCTURE  BAPI_ALM_ORDER_PERMIT OPTIONAL
+*"      IT_PERMIT_UP STRUCTURE  BAPI_ALM_ORDER_PERMIT_UP OPTIONAL
+*"      IT_PERMIT_ISSUE STRUCTURE  BAPI_ALM_ORDER_PERMITISSUE OPTIONAL
+*"      IT_ESTIMATED_COSTS STRUCTURE  BAPI_ALM_ORDER_COSTS_EST_I
+*"       OPTIONAL
+*"      IT_HEADER_JVA STRUCTURE  BAPI_ALM_ORDER_JVA OPTIONAL
+*"      IT_HEADER_JVA_UP STRUCTURE  BAPI_ALM_ORDER_JVA_UP OPTIONAL
+*"      IT_ADDITIONAL_TEXT STRUCTURE  BAPI_ALM_CC4_ADDITIONAL_TEXT
+*"       OPTIONAL
+*"----------------------------------------------------------------------
+  TEST-SEAM get_bapi_maintain1.                                    "note 3366949
+ENHANCEMENT-POINT bapi_alm_order_maintain_g8 SPOTS es_saplibapi_alm_order STATIC.
 
-*&---------------------------------------------------------------------*
-*& Include          ZIN_CMX_WORKORDER_F01
-*&---------------------------------------------------------------------*
+ENHANCEMENT-POINT bapi_alm_order_maintain_g6 SPOTS es_saplibapi_alm_order.
 
-*---------------------------------------------------------------------*
-* Fetch candidate orders
-*---------------------------------------------------------------------*
-FORM f_get_orders.
-  SELECT SINGLE atinn INTO gv_atinn
-    FROM cabn
-   WHERE atnam = 'INTERFACE'.
-  IF sy-subrc <> 0.
-    MESSAGE 'Characteristic INTERFACE not found' TYPE 'E'.
-  ENDIF.
 
-  SELECT * FROM viaufkst
-    INTO TABLE gt_orders
-   WHERE auart = 'YA07'                  "force YA07
-     AND auart IN so_auart
-     AND iwerk IN so_werks
-     AND aufnr IN so_aufnr
-     AND equnr IN so_equnr
-     AND tplnr IN so_floc.
-ENDFORM.
+* BAPI Funktionsbaustein zum Bearbeiten von ALM Aufträgen (PM/CS)
+* Die gewünschten Funktionen müssen über eine Methodentabelle
+* übergeben werden. Darin stehen die auszuführenden Methoden.
+* Die dazugehörigen Daten sind in den einzelnen Datentabellen
+* zuzuordnen.
+* Weitere Informationen befinden sich im BAPI Explorer unter
+* Instandhaltungsabwicklung bzw. Serviceabwicklung
 
-*---------------------------------------------------------------------*
-* Check order statuses and eligibility
-*---------------------------------------------------------------------*
-FORM f_check_status USING ps_order TYPE viaufkst.
+* Datendefinitionen ***************************************
+  DATA lt_methods      TYPE bapi_alm_order_method_t.
+* Zu bearbeitende Aufträge, die gelesen werden müssen
+  DATA lt_orders       TYPE almb_ord_pre_tab.
+* Methodenreihenfolge
+  DATA lt_method_level TYPE almb_proc_level_tab.
 
-  DATA: lv_obj   TYPE cuobj,
-        lv_value TYPE atwrt,
-        lv_stat  TYPE jest-stat,
-        lv_date  TYPE udate,
-        lv_time  TYPE utime,
-        lv_objid TYPE c LENGTH 20,
-        lv_vornr TYPE vornr.
+* Interne Datentabellen ***********************************
+* Auftragsköpfe
+  DATA lt_caufvd              TYPE almb_caufvd_tab_int.
+  DATA lt_caufvd_up           TYPE almb_caufvd_up_tab_int.
+* Servicedaten Auftragsköpfe
+  DATA lt_pmsdo               TYPE almb_caufvd_srv_tab_int.
+  DATA lt_pmsdo_up            TYPE almb_caufvd_srv_up_tab_int.
+* Auftragsköpfe (extern)
+  DATA lt_bapihead            TYPE almb_caufvd_tab.
+  DATA ls_bapihead            TYPE LINE OF almb_caufvd_tab.
+  DATA lt_bapihead_up         TYPE almb_caufvd_up_tab.
+  DATA ls_bapihead_up         TYPE LINE OF almb_caufvd_up_tab.
+  DATA lt_bapihead_old        TYPE almb_caufvd_tab.
+  DATA lt_bapihead_old_up     TYPE almb_caufvd_up_tab.
+* Servicedaten Auftragsköpfe (extern)
+  DATA lt_bapisrvcdata        TYPE almb_caufvd_srv_tab.
+  DATA ls_bapisrvcdata        TYPE LINE OF almb_caufvd_srv_tab.
+  DATA lt_bapisrvcdata_up     TYPE almb_caufvd_srv_up_tab.
+  DATA ls_bapisrvcdata_up     TYPE LINE OF almb_caufvd_srv_up_tab.
+  DATA lt_bapisrvcdata_old    TYPE almb_caufvd_srv_tab.
+  DATA lt_bapisrvcdata_old_up TYPE almb_caufvd_srv_up_tab.
+* Auftragskopfdaten nach BADI für Abwärtskompatibilität
+  DATA ls_header              TYPE bapi_alm_order_headers_i.
+  DATA ls_header_up           TYPE bapi_alm_order_headers_up.
+  DATA ls_header_srv          TYPE bapi_alm_order_srvdat_e.
+  DATA ls_header_srv_up       TYPE bapi_alm_order_srvdat_up.
+  DATA lt_header              TYPE TABLE OF bapi_alm_order_headers_i.
+  DATA lt_header_up           TYPE TABLE OF bapi_alm_order_headers_up.
+  DATA lt_header_srv          TYPE TABLE OF bapi_alm_order_srvdat_e.
+  DATA lt_header_srv_up       TYPE TABLE OF bapi_alm_order_srvdat_up.
+* Userstatus
+  DATA lt_userstatus    TYPE almb_userstatus.
+* Partner
+  DATA lt_partner       TYPE almb_partner_tab.
+  DATA lt_partner_up    TYPE almb_partner_up_tab.
+* Vorgänge
+  DATA lt_afvgd         TYPE almb_afvgd_tab.
+  DATA lt_afvgd_up      TYPE almb_afvgd_up_tab.
+* Anordnungsbeziehungen
+  DATA lt_afabd         TYPE almb_afabd_tab.
+  DATA lt_afabd_up      TYPE almb_afabd_up_tab.
+* Komponenten
+  DATA lt_resbd         TYPE almb_resbd_tab.
+  DATA lt_resbd_up      TYPE almb_resbd_up_tab.
+* Objektliste
+  DATA lt_riwol         TYPE almb_riwol_tab.
+  DATA lt_riwol_up      TYPE almb_riwol_up_tab.
+* Objectlist: Relation Operation to Objectlist
+  DATA lt_olist_relation  TYPE almb_olist_relation_tab.
+* Task lists
+  DATA lt_tasklists     TYPE ibapi_order_tasklists_i_t.
+* Settlement rules
+  DATA lt_cobl          TYPE almb_cobl_tab.
+  DATA lt_cobl_up       TYPE almb_cobl_up_tab.
+* Langtexte
+  DATA lt_text          TYPE almb_text_tab.
+  DATA lt_text_add      TYPE almb_cc4_add_text_tab.          "note 2756658
+  DATA lt_text_lines    TYPE tlinetab.
+* Rückgabe der Nachrichten
+  DATA lt_messages      TYPE bal_t_msg.
+  DATA ls_messages      TYPE bal_s_msg.
+  DATA ls_return        LIKE LINE OF return[].
+  DATA lv_error         TYPE sy-subrc.
+*Refurbishment order
+  DATA lt_afpod           TYPE ibapi_afpod_tt.
+  DATA lt_afpod_resbd     TYPE ibapi_reforder_comp_tt.
+  DATA lt_serno_olist_ins TYPE reford_serno_olist_t.
+  DATA lt_serno_olist_del TYPE reford_serno_olist_t.
+  DATA lt_afpod_up        TYPE ibapi_afpod_update_tt.
+  DATA lt_afpod_resbd_up  TYPE ibapi_reforder_comp_update_tt.
+  DATA lt_reford_afvgd    TYPE almb_afvgd_tab.
+*PRTs
+  DATA lt_prt             TYPE bapi_alm_order_prt_i_t.
+  DATA lt_prt_up          TYPE bapi_alm_order_prt_up_t.
+*Service packages
+  DATA lt_serviceoutline           TYPE bapi_alm_srv_outline_t.
+  DATA lt_serviceoutline_up        TYPE bapi_alm_srv_outline_up_t.
+  DATA lt_servicelines             TYPE bapi_alm_srv_service_line_t.
+  DATA lt_servicelines_up          TYPE bapi_alm_srv_service_line_up_t.
+  DATA lt_servicelimit             TYPE bapi_alm_srv_limit_data_t.
+  DATA lt_servicelimit_up          TYPE bapi_alm_srv_limit_data_up_t.
+  DATA lt_servicecontractlimits    TYPE bapi_alm_srv_contract_limit_t.
+  DATA lt_servicecontractlimits_up TYPE bapi_alm_srv_contr_limits_u_t.
+* Note 1989741 - begin
+  DATA: ls_extension_up            TYPE almb_extension_up.
+  DATA: lt_extension_up            TYPE almb_extension_up_tab.
+* Note 1989741 - end
 
-  "Classification object
-  IF ps_order-equnr IS NOT INITIAL.
-    SELECT SINGLE cuobj INTO lv_obj FROM inob WHERE objek = ps_order-equnr.
-  ELSE.
-    SELECT SINGLE cuobj INTO lv_obj FROM inob WHERE objek = ps_order-tplnr.
-  ENDIF.
-  IF lv_obj IS INITIAL. RETURN. ENDIF.
+*Permits
+  DATA lt_permit       TYPE eam_t_permit_order.
+  DATA lt_permit_up    TYPE eam_t_permit_order_up.
+  DATA lt_permit_issue TYPE eam_t_permit_issue.
 
-  "INTERFACE=CMX?
-  SELECT SINGLE atwrt INTO lv_value FROM ausp
-   WHERE objek = lv_obj AND atinn = gv_atinn.
-  IF sy-subrc <> 0 OR lv_value <> 'CMX'. RETURN. ENDIF.
+* Estimated costs
+  DATA: lt_est_cost    TYPE bapi_alm_order_costs_est_i_tt.  " 1672966 EAMCC PM110
 
-  "Status check
-  SELECT SINGLE stat INTO lv_stat FROM jest
-   WHERE objnr = ps_order-objnr
-     AND stat IN (c_stat_rel, c_stat_teco, c_stat_lkd)
-     AND inact = ''.
-  IF sy-subrc <> 0. RETURN. ENDIF.
+* Settlement profiles
+  DATA: lt_settlmt_profile TYPE almb_settlmt_profile_tab.
 
-  "Skip if CMXC
-  SELECT SINGLE stat
-    INTO lv_stat
-    FROM jest
-   WHERE objnr = ps_order-objnr
-     AND stat = c_stat_cmxc
-     AND inact = ''.
-  IF sy-subrc = 0. RETURN. ENDIF.
+* >>>>> Begin note 2304265: DFPS specific variables
+  DATA lv_method_del TYPE abap_bool.
+* <<<<< End note 2304265
 
-  "Change check
-  CONCATENATE sy-mandt '30' ps_order-aufnr INTO lv_objid.
-  SELECT MAX( udate ) MAX( utime )
-    INTO (lv_date, lv_time)
-    FROM cdhdr
-   WHERE objectclas = 'ORDER'
-     AND objectid    = lv_objid.
+*  DATA lt_serno_olist_up TYPE REFORD_SERNO_OLIST_UPDATE_TT.
 
-  IF ( lv_date < so_date-low OR
-       ( lv_date = so_date-low AND lv_time < so_time-low ) ).
-    SELECT SINGLE stat
-      INTO @lv_stat
-      FROM jest
-     WHERE objnr = @ps_order-objnr
-       AND stat = @c_stat_cmxs
-       AND inact = ''.
-    IF sy-subrc = 0. RETURN. ENDIF.
-  ENDIF.
+  FIELD-SYMBOLS
+    <fs_olist_relation> LIKE LINE OF lt_olist_relation.
+  FIELD-SYMBOLS <fs_methods> LIKE LINE OF lt_methods.       "1837200
 
-  "Get operation
-  PERFORM f_get_operation USING ps_order CHANGING lv_vornr.
+  cl_eam_usage=>insert('BAPI_ALM_ORDER_MAINTAIN').
+* BADIs
+* Vorwärtsdeklaration für exit handler BAdI
+  CLASS cl_exithandler DEFINITION LOAD.
 
-  PERFORM f_prepare_output USING ps_order lv_vornr lv_stat.
+* Interfacereferenz für BAdI
+  STATICS sr_modify_input_data TYPE REF TO if_ex_ibapi_alm_ord_modify.
+  STATICS sv_badiactive.
+* Konstante für BAdI-Referenzierung
+  CONSTANTS lc_badiname TYPE exit_def VALUE 'IBAPI_ALM_ORD_MODIFY'.
 
-ENDFORM.
+* start FLE MATNR BAPI Changes
+  DATA: ls_fnames             TYPE cl_matnr_chk_mapper=>ts_matnr_bapi_fnames,
+        lt_fnames_hdr         TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_hdr_srv     TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_comp        TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_obj_list    TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_oper        TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_prt         TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_ref_ord_itm TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname,
+        lt_fnames_ref_ord_opr TYPE cl_matnr_chk_mapper=>tt_matnr_bapi_fname.
+  DATA: lt_matnr_data_to_x_key_fnames  TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: lt_matnr_dta_2_xkey_fnames_hdr TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: lt_mtnr_dta2xkey_fnames_hdrsrv TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: lt_matnr_dta_2_xkey_fnames_opr TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: lt_matnr_dta_2_xkey_fnames_cmp TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: lt_mtnr_dta2xkey_fnames_rfoitm TYPE cl_matnr_chk_mapper=>tt_matnr_data_to_x_key_fnames.
+  DATA: ls_matnr_data_to_x_key_fnames  LIKE LINE OF lt_matnr_data_to_x_key_fnames.
+  DATA: ls_matnr_data_to_x_line_ass    TYPE  cl_matnr_chk_mapper=>ts_matnr_data_to_x_line_ass.
+  DATA: lt_matnr_data_to_x_line_ass    TYPE  cl_matnr_chk_mapper=>tt_matnr_data_to_x_line_ass.
+  DATA: lv_linecount_data              TYPE i.
+  DATA: lv_linecount_data_up           TYPE i.
 
-*---------------------------------------------------------------------*
-* Get first operation
-*---------------------------------------------------------------------*
-FORM f_get_operation USING ps_order TYPE viaufkst
-                     CHANGING pv_vornr TYPE afvc-vornr.
+* MATERIAL
+  CLEAR ls_fnames.
+  ls_fnames-int    = 'MATERIAL'.
+  ls_fnames-ext    = 'MATERIAL_EXTERNAL'.
+  ls_fnames-vers   = 'MATERIAL_VERSION'.
+  ls_fnames-guid   = 'MATERIAL_GUID'.
+  ls_fnames-long   = 'MATERIAL_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_prt.
+  ls_fnames-int_x  = 'MATERIAL'.
+  ls_fnames-ext_x  = 'MATERIAL'.   "no update flag existing, flag of internal field is used
+  ls_fnames-vers_x = 'MATERIAL'.   "no update flag existing, flag of internal field is used
+*  ls_fnames-guid_x = 'MATERIAL_GUID'.
+  ls_fnames-long_x = 'MATERIAL_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_hdr.
+  INSERT ls_fnames INTO TABLE lt_fnames_hdr_srv.
+  INSERT ls_fnames INTO TABLE lt_fnames_comp.
 
-  SELECT vornr, aufpl, aplzl, objnr
-    FROM afvc
-    WHERE aufpl = @ps_order-aufpl
-    ORDER BY aplzl
-    INTO @DATA(ls_afvc)
-    UP TO 1 ROWS.
-  ENDSELECT.
+* ASSEMBLY
+  CLEAR ls_fnames.
+  ls_fnames-int    = 'ASSEMBLY'.
+  ls_fnames-ext    = 'ASSEMBLY_EXTERNAL'.
+  ls_fnames-vers   = 'ASSEMBLY_VERSION'.
+  ls_fnames-guid   = 'ASSEMBLY_GUID'.
+  ls_fnames-long   = 'ASSEMBLY_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_ref_ord_opr.
+  INSERT ls_fnames INTO TABLE lt_fnames_obj_list.
+  ls_fnames-int_x  = 'ASSEMBLY'.
+  ls_fnames-ext_x  = 'ASSEMBLY'.   "no update flag existing, flag of internal field is used
+  ls_fnames-vers_x = 'ASSEMBLY'.    "no update flag existing, flag of internal field is used
+*  ls_fnames-guid_x = 'ASSEMBLY_GUID'.
+  ls_fnames-long_x = 'ASSEMBLY_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_hdr.
+  INSERT ls_fnames INTO TABLE lt_fnames_oper.
 
-  IF sy-subrc = 0.
-    pv_vornr = ls_afvc-vornr.
-  ENDIF.
+* SERMAT
+  CLEAR ls_fnames.
+  ls_fnames-int    = 'SERMAT'.
+  ls_fnames-ext    = 'SERMAT_EXTERNAL'.
+  ls_fnames-vers   = 'SERMAT_VERSION'.
+  ls_fnames-guid   = 'SERMAT_GUID'.
+  ls_fnames-long   = 'SERMAT_LONG'.
+*  ls_fnames-int_x  = 'SERMAT'.
+*  ls_fnames-ext_x  = 'SERMAT_EXTERNAL'.
+*  ls_fnames-vers_x = 'SERMAT_VERSION'.
+*  ls_fnames-guid_x = 'SERMAT_GUID'.
+*  ls_fnames-long_x = 'SERMAT_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_obj_list.
 
-  "Skip deleted ops
-  IF sy-subrc = 0 AND ls_afvc-objnr IS NOT INITIAL.
-    SELECT SINGLE stat
-      INTO @DATA(lv_stat)
-      FROM jest
-      WHERE objnr = @ls_afvc-objnr
-      AND stat = 'I0013'
-      AND inact = ''.
+* MATERIAL_TO
+  CLEAR ls_fnames.
+  ls_fnames-int    = 'MATERIAL_TO'.
+  ls_fnames-ext    = 'MATERIAL_TO_EXTERNAL'.
+  ls_fnames-vers   = 'MATERIAL_TO_VERSION'.
+  ls_fnames-guid   = 'MATERIAL_TO_GUID'.
+  ls_fnames-long   = 'MATERIAL_TO_LONG'.
+  ls_fnames-int_x  = 'MATERIAL_TO'.
+  ls_fnames-ext_x  = 'MATERIAL_TO'.   "no update flag existing, flag of internal field is used
+  ls_fnames-vers_x = 'MATERIAL_TO'.    "no update flag existing, flag of internal field is used
+*  ls_fnames-guid_x = 'MATERIAL_TO_GUID'.
+  ls_fnames-long_x = 'MATERIAL_TO_LONG'.
+  INSERT ls_fnames INTO TABLE lt_fnames_ref_ord_itm.
 
-    IF sy-subrc = 0.
-      CLEAR pv_vornr.
+* IT_HEADER
+  CLEAR ls_matnr_data_to_x_key_fnames.
+  ls_matnr_data_to_x_key_fnames-data_key_field =  'ORDERID'.
+  ls_matnr_data_to_x_key_fnames-x_key_field    =  'ORDERID'.
+  APPEND ls_matnr_data_to_x_key_fnames TO lt_matnr_dta_2_xkey_fnames_hdr.
+
+  cl_matnr_chk_mapper=>bapi_tables_conv_tab_x_names(
+    EXPORTING
+      iv_int_to_external            = abap_false
+      it_fnames                     = lt_fnames_hdr
+      it_matnr_data_to_x_key_fnames = lt_matnr_dta_2_xkey_fnames_hdr
+    CHANGING
+      ct_matnr                      = it_header[]
+      ct_matnrx                     = it_header_up[]
+    EXCEPTIONS
+      excp_matnr_ne                 = 1
+      excp_matnr_invalid_input      = 2
+      OTHERS                        = 3
+  ).
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
     ENDIF.
   ENDIF.
-ENDFORM.
 
-*---------------------------------------------------------------------*
-* Prepare output
-*---------------------------------------------------------------------*
-FORM f_prepare_output USING ps_order TYPE viaufkst
-                            pv_vornr TYPE vornr
-                            pv_stat  TYPE jest-stat.
+* IT_HEADER_SRV - No key fields
+  DESCRIBE TABLE it_header_srv[]    LINES lv_linecount_data.
+  DESCRIBE TABLE it_header_srv_up[] LINES lv_linecount_data_up.
+  CLEAR lt_matnr_data_to_x_line_ass[].
+  IF lv_linecount_data = lv_linecount_data_up.
+    lv_linecount_data = 0.
+    WHILE lv_linecount_data LT lv_linecount_data_up.
+      ADD 1 TO lv_linecount_data.
+      ls_matnr_data_to_x_line_ass-ass_x_line_idx = lv_linecount_data.
+      ls_matnr_data_to_x_line_ass-data_line_idx  = lv_linecount_data.
+      APPEND ls_matnr_data_to_x_line_ass TO lt_matnr_data_to_x_line_ass.
+    ENDWHILE.
+  ENDIF.
+  cl_matnr_chk_mapper=>bapi_tables_conv_tab_x_idx(
+    EXPORTING
+      iv_int_to_external          = abap_false
+      it_fnames                   = lt_fnames_hdr_srv
+      it_matnr_data_to_x_line_ass = lt_matnr_data_to_x_line_ass
+    CHANGING
+      ct_matnr                    = it_header_srv[]
+      ct_matnrx                   = it_header_srv_up[]
+    EXCEPTIONS
+      excp_matnr_ne               = 1
+      excp_matnr_invalid_input    = 2
+      OTHERS                      = 3
+  ).
 
-  CLEAR gs_output.
-  gs_output-order_msg_status = 'CREATE'.
-  gs_output-werks   = ps_order-iwerk.
-  gs_output-aufnr   = ps_order-aufnr.
-  gs_output-vornr   = pv_vornr.
-  gs_output-gstrp   = ps_order-gstrp.
-  gs_output-gltrp   = ps_order-gltrp.
-  gs_output-lacdate = ps_order-lacd_date.
-  gs_output-system_id = sy-sysid.
-
-  SELECT SINGLE txt04 INTO gs_output-stat_txt
-    FROM tj02t
-   WHERE istat = pv_stat
-     AND spras = sy-langu.
-
-  IF ps_order-equnr IS NOT INITIAL.
-    gs_output-obj_txt = ps_order-equnr.
-  ELSE.
-    gs_output-obj_txt = ps_order-tplnr.
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
   ENDIF.
 
-  APPEND gs_output TO gt_output.
+* IT_OPERATION - No key fields
+*  DESCRIBE TABLE it_operation[]    LINES lv_linecount_data.
+*  DESCRIBE TABLE it_operation_up[] LINES lv_linecount_data_up.
+*  CLEAR lt_matnr_data_to_x_line_ass[].
+*  IF lv_linecount_data = lv_linecount_data_up.
+*    lv_linecount_data = 0.
+*    WHILE lv_linecount_data LT lv_linecount_data_up.
+*      ADD 1 TO lv_linecount_data.
+*      ls_matnr_data_to_x_line_ass-ass_x_line_idx = lv_linecount_data.
+*      ls_matnr_data_to_x_line_ass-data_line_idx  = lv_linecount_data.
+*      APPEND ls_matnr_data_to_x_line_ass TO lt_matnr_data_to_x_line_ass.
+*    ENDWHILE.
+*  ENDIF.
+  CLEAR lt_matnr_data_to_x_line_ass[].
+  LOOP AT it_operation_up.
+    READ TABLE it_operation INDEX sy-tabix TRANSPORTING NO FIELDS.
+    IF sy-subrc IS INITIAL.
+      ls_matnr_data_to_x_line_ass-ass_x_line_idx = sy-tabix.
+      ls_matnr_data_to_x_line_ass-data_line_idx  = sy-tabix.
+      APPEND ls_matnr_data_to_x_line_ass TO lt_matnr_data_to_x_line_ass.
+    ENDIF.
+  ENDLOOP.
+  cl_matnr_chk_mapper=>bapi_tables_conv_tab_x_idx(
+    EXPORTING
+      iv_int_to_external          = abap_false
+      it_fnames                   = lt_fnames_oper
+      it_matnr_data_to_x_line_ass = lt_matnr_data_to_x_line_ass
+    CHANGING
+      ct_matnr                    = it_operation[]
+      ct_matnrx                   = it_operation_up[]
+    EXCEPTIONS
+      excp_matnr_ne               = 1
+      excp_matnr_invalid_input    = 2
+      OTHERS                      = 3
+  ).
 
-ENDFORM.
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
 
-*---------------------------------------------------------------------*
-* Update SAP status (now using work area, not field-symbols)
-*---------------------------------------------------------------------*
-FORM f_send_cmx.
-  DATA ls_output LIKE LINE OF gt_output.
+* IT_COMPONENT - No key fields
+*  DESCRIBE TABLE it_component[]    LINES lv_linecount_data.
+*  DESCRIBE TABLE it_component_up[] LINES lv_linecount_data_up.
+*  CLEAR lt_matnr_data_to_x_line_ass[].
+*  IF lv_linecount_data = lv_linecount_data_up.
+*    lv_linecount_data = 0.
+*    WHILE lv_linecount_data LT lv_linecount_data_up.
+*      ADD 1 TO lv_linecount_data.
+*      ls_matnr_data_to_x_line_ass-ass_x_line_idx = lv_linecount_data.
+*      ls_matnr_data_to_x_line_ass-data_line_idx  = lv_linecount_data.
+*      APPEND ls_matnr_data_to_x_line_ass TO lt_matnr_data_to_x_line_ass.
+*    ENDWHILE.
+*  ENDIF.
+  CLEAR lt_matnr_data_to_x_line_ass[].
+  LOOP AT it_component_up.
+    READ TABLE it_component INDEX sy-tabix TRANSPORTING NO FIELDS.
+    IF sy-subrc IS INITIAL.
+      ls_matnr_data_to_x_line_ass-ass_x_line_idx = sy-tabix.
+      ls_matnr_data_to_x_line_ass-data_line_idx  = sy-tabix.
+      APPEND ls_matnr_data_to_x_line_ass TO lt_matnr_data_to_x_line_ass.
+    ENDIF.
+  ENDLOOP.
+  cl_matnr_chk_mapper=>bapi_tables_conv_tab_x_idx(
+    EXPORTING
+      iv_int_to_external          = abap_false
+      it_fnames                   = lt_fnames_comp
+      it_matnr_data_to_x_line_ass = lt_matnr_data_to_x_line_ass
+    CHANGING
+      ct_matnr                    = it_component[]
+      ct_matnrx                   = it_component_up[]
+    EXCEPTIONS
+      excp_matnr_ne               = 1
+      excp_matnr_invalid_input    = 2
+      OTHERS                      = 3
+  ).
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
 
-  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
-    DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
-          lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
-          lt_methods TYPE TABLE OF bapi_alm_order_method,
-          ls_header  TYPE bapi_alm_order_headers_i,
-          ls_status  TYPE bapi_alm_order_usrstat,
-          ls_method  TYPE bapi_alm_order_method,
-          lt_return  TYPE TABLE OF bapiret2,
-          ls_return  TYPE bapiret2.
+* IT_REFORDER_ITEM
+  CLEAR ls_matnr_data_to_x_key_fnames.
+  ls_matnr_data_to_x_key_fnames-data_key_field =  'ORDERID'.
+  ls_matnr_data_to_x_key_fnames-x_key_field    =  'ORDERID'.
+  APPEND ls_matnr_data_to_x_key_fnames TO lt_mtnr_dta2xkey_fnames_rfoitm.
 
-    CLEAR: lt_header, lt_status, lt_methods, lt_return.
+  cl_matnr_chk_mapper=>bapi_tables_conv_tab_x_names(
+    EXPORTING
+      iv_int_to_external            = abap_false
+      it_fnames                     = lt_fnames_ref_ord_itm
+      it_matnr_data_to_x_key_fnames = lt_mtnr_dta2xkey_fnames_rfoitm
+    CHANGING
+      ct_matnr                      = it_reforder_item[]
+      ct_matnrx                     = it_reforder_item_up[]
+    EXCEPTIONS
+      excp_matnr_ne                 = 1
+      excp_matnr_invalid_input      = 2
+      OTHERS                        = 3
+  ).
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
 
-    " Header
-    ls_header-orderid = <ls_output_row>-aufnr.
-    APPEND ls_header TO lt_header.
+* IT_OBJECTLIST
+* No UP-structure with material field
+  CALL METHOD cl_matnr_chk_mapper=>bapi_tables_conv_tab
+    EXPORTING
+      iv_int_to_external       = abap_false
+      it_fnames                = lt_fnames_obj_list
+    CHANGING
+      ct_matnr                 = it_objectlist[]
+    EXCEPTIONS
+      excp_matnr_ne            = 1
+      excp_matnr_invalid_input = 2
+      OTHERS                   = 3.
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
 
-    " User status
-    ls_status-user_st_text = 'CMXS'.
-    ls_status-langu        = 'EN'.
-    ls_status-langu_iso    = 'E'.
-    APPEND ls_status TO lt_status.
+* IT_PRT
+* No UP-structure with material field
+  CALL METHOD cl_matnr_chk_mapper=>bapi_tables_conv_tab
+    EXPORTING
+      iv_int_to_external       = abap_false
+      it_fnames                = lt_fnames_prt
+    CHANGING
+      ct_matnr                 = it_prt[]
+    EXCEPTIONS
+      excp_matnr_ne            = 1
+      excp_matnr_invalid_input = 2
+      OTHERS                   = 3.
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
 
-    " Method for user status
-    ls_method-refnumber = '000001'.
-    ls_method-objecttype = 'HEADER'.
-    ls_method-method     = 'USERSTATUS'.
-    ls_method-objectkey  = <ls_output_row>-aufnr.
-    APPEND ls_method TO lt_methods.
+* IT_REFORDER_OPERATION
+* No UP-structure
+  CALL METHOD cl_matnr_chk_mapper=>bapi_tables_conv_tab
+    EXPORTING
+      iv_int_to_external       = abap_false
+      it_fnames                = lt_fnames_ref_ord_opr
+    CHANGING
+      ct_matnr                 = it_reforder_operation[]
+    EXCEPTIONS
+      excp_matnr_ne            = 1
+      excp_matnr_invalid_input = 2
+      OTHERS                   = 3.
+  IF sy-subrc NE 0.
+    CALL METHOD cl_matnr_chk_mapper=>bapi_get_last_error
+      IMPORTING
+        ev_return = ls_return.
+    APPEND ls_return TO return.
+    IF ls_return-type NA 'SIW'.
+      RETURN.
+    ENDIF.
+  ENDIF.
+* end FLE MATNR BAPI Changes
 
-    " Call BAPI
-    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
-      TABLES
-        it_header     = lt_header
-        it_methods    = lt_methods
-        it_userstatus = lt_status
-        return        = lt_return
-      EXCEPTIONS
-        OTHERS        = 1.
+* Initialisierungen ***************************************
 
-    IF sy-subrc <> 0.
-      <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
-    ELSE.
-      " Check messages
-      READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
-      IF sy-subrc = 0.
-        <ls_output_row>-msg = ls_return-message.
-        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
-      ELSE.
-        <ls_output_row>-msg = 'CMXS status updated successfully'.
-        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
-          EXPORTING wait = 'X'.
+* setzen BAPI-Flag z.B. für Prüfloserzeugung
+  MOVE 'X' TO gv_bapi_flg.                                 "note 1302002
+
+* Memory refresh
+  CALL FUNCTION 'IBAPI_PROC_INIT_REQUEST'.
+
+* Badi initialisieren
+  IF sv_badiactive IS INITIAL.
+    CALL METHOD cl_exithandler=>get_instance
+      EXPORTING
+        exit_name              = lc_badiname
+        null_instance_accepted = 'X'
+      CHANGING
+        instance               = sr_modify_input_data.
+    sv_badiactive = 'X'.
+  ENDIF.
+
+* Retrunparemetertabellen löschen
+  CLEAR   return[].
+  CLEAR   et_numbers[].
+
+  END-TEST-SEAM.                                                   "note 3366949
+
+  DATA(lv_bapiflag_origin) = abap_false.                           "note 3406469
+* globales Bapiflag setzen
+  CALL FUNCTION 'IBAPI_Z_SET_BAPI_FLAG'
+    EXPORTING
+      iv_flag           = abap_true
+    IMPORTING
+      ev_previous_state = lv_bapiflag_origin.                      "note 3406469
+
+  CALL FUNCTION 'DIALOG_GET_STATUS'              "Note 1441350
+    IMPORTING                                    "Note 1441350
+      dialog_status = gv_dialog.                 "Note 1441350
+
+  TEST-SEAM get_bapi_maintain2.                                    "note 3366949
+
+  CALL FUNCTION 'DIALOG_SET_NO_DIALOG'. "Note 1441350
+
+* Aktionsbuffer für Auftragskopfdaten
+  CALL FUNCTION 'IBAPI_ALM_ORDER_INIT_ACTIONS'.
+
+* Application Log initialisieren
+  PERFORM alm_order_msg_log_init.
+
+* Tabelle mit Methoden kopieren
+  MOVE it_methods[] TO lt_methods.
+
+* start of note 1837200
+* usage of method DIALOG together with MMSRV is not supported
+  READ TABLE lt_methods TRANSPORTING NO FIELDS
+                        WITH KEY method = 'DIALOG'.
+  IF sy-subrc = 0.
+    LOOP AT lt_methods ASSIGNING <fs_methods>
+                       WHERE objecttype CS 'SERVICE'.
+      MESSAGE e137(iwo_bapi2) WITH <fs_methods>-objecttype INTO mess.
+      bapi_message.
+      MESSAGE e113(iwo_bapi2) INTO mess.
+      bapi_message.
+      PERFORM end_bapi using lv_bapiflag_origin CHANGING return[]. "note 3406469
+      PERFORM reset_created_headers USING et_numbers[] lt_method_level.
+      RETURN.
+    ENDLOOP.
+  ENDIF.
+* end of note 1837200
+
+* Schnittstellendaten in interne Strukturen umwandeln *****
+  CALL FUNCTION 'IBAPI_PROC_INTERFACE_E2I'
+    EXPORTING
+      it_header                   = it_header[]
+      it_header_up                = it_header_up[]
+      it_header_srv               = it_header_srv[]
+      it_header_srv_up            = it_header_srv_up[]
+      it_userstatus               = it_userstatus[]
+      it_partner                  = it_partner[]
+      it_partner_up               = it_partner_up[]
+      it_operation                = it_operation[]
+      it_operation_up             = it_operation_up[]
+      it_relation                 = it_relation[]
+      it_relation_up              = it_relation_up[]
+      it_component                = it_component[]
+      it_component_up             = it_component_up[]
+      it_objectlist               = it_objectlist[]
+      it_objectlist_up            = it_objectlist_up[]
+      it_olist_relation           = it_olist_relation[]
+      it_srule                    = it_srule[]
+      it_srule_up                 = it_srule_up[]
+      it_text                     = it_text[]
+      it_text_lines               = it_text_lines[]
+      it_tasklists                = it_tasklists[]
+      it_reforder_item            = it_reforder_item[]
+      it_reforder_item_up         = it_reforder_item_up[]
+      it_reforder_operation       = it_reforder_operation[]
+      it_reforder_serno_olist_ins = it_reforder_serno_olist_ins[]
+      it_reforder_serno_olist_del = it_reforder_serno_olist_del[]
+      it_serviceoutline           = it_serviceoutline[]
+      it_servicelines             = it_servicelines[]
+      it_servicelimit             = it_servicelimit[]
+      it_servicecontractlimits    = it_servicecontractlimits[]
+      it_serviceoutline_up        = it_serviceoutline_up[]
+      it_servicelines_up          = it_servicelines_up[]
+      it_servicelimit_up          = it_servicelimit_up[]
+      it_servicecontractlimits_up = it_servicecontractlimits_up[]
+      it_permit                   = it_permit[]
+      it_permit_up                = it_permit_up[]
+      it_permit_issue             = it_permit_issue[]
+      it_estimated_costs          = it_estimated_costs[]       " 1672966 EAMCC PM110
+      it_header_jva               = it_header_jva[]
+      it_header_jva_up            = it_header_jva_up[]
+      it_text_add                 = it_additional_text[]      "note 2756658
+    IMPORTING
+      et_caufvd                   = lt_caufvd
+      et_caufvd_up                = lt_caufvd_up
+      et_caufvd_srv               = lt_pmsdo
+      et_caufvd_srv_up            = lt_pmsdo_up
+      et_userstatus               = lt_userstatus
+      et_partner                  = lt_partner
+      et_partner_up               = lt_partner_up
+      et_afvgd                    = lt_afvgd
+      et_afvgd_up                 = lt_afvgd_up
+      et_afabd                    = lt_afabd
+      et_afabd_up                 = lt_afabd_up
+      et_resbd                    = lt_resbd
+      et_resbd_up                 = lt_resbd_up
+      et_riwol                    = lt_riwol
+      et_riwol_up                 = lt_riwol_up
+      et_olist_relation           = lt_olist_relation
+      et_cobl                     = lt_cobl
+      et_cobl_up                  = lt_cobl_up
+      et_thead                    = lt_text
+      et_tlines                   = lt_text_lines
+      et_tasklists                = lt_tasklists
+      et_afpod                    = lt_afpod
+      et_afpod_up                 = lt_afpod_up
+      et_afpod_resbd              = lt_afpod_resbd
+      et_afpod_resbd_up           = lt_afpod_resbd_up
+      et_reford_afvgd             = lt_reford_afvgd
+      et_serno_olist_ins          = lt_serno_olist_ins
+      et_serno_olist_del          = lt_serno_olist_del
+      et_serviceoutline           = lt_serviceoutline
+      et_servicelines             = lt_servicelines
+      et_servicelimit             = lt_servicelimit
+      et_servicecontractlimits    = lt_servicecontractlimits
+      et_serviceoutline_up        = lt_serviceoutline_up
+      et_servicelines_up          = lt_servicelines_up
+      et_servicelimit_up          = lt_servicelimit_up
+      et_servicecontractlimits_up = lt_servicecontractlimits_up
+      et_permit                   = lt_permit
+      et_permit_up                = lt_permit_up
+      et_permit_issue             = lt_permit_issue
+      et_estimated_costs          = lt_est_cost               " 1672966 EAMCC PM110
+      et_thead_add                = lt_text_add               "note 2756658
+      et_settlement_profile       = lt_settlmt_profile
+    EXCEPTIONS
+      conversion_error            = 1
+      textline_error              = 2
+      OTHERS                      = 3.
+  IF sy-subrc NE 0.
+    PERFORM end_bapi using lv_bapiflag_origin CHANGING return[].   "note 3406469
+    EXIT.
+  ENDIF.
+
+*--- fill PRT data in int. tables (mapping is performed later)
+  lt_prt    = it_prt[].
+  lt_prt_up = it_prt_up[].
+
+* BADI zum prüfen und ändern der Eingabedaten *************
+* aufrufen. Zu diesem Zeitpunkt sind die meisten **********
+* Daten im internen Format verfügbar **********************
+
+  IF NOT sr_modify_input_data IS INITIAL.
+*   Abwärtskompatibilität: In frühen Versionen wurden nur die externen
+*   Repräsentationen der Auftragskopfdaten angeboten. Dabei können nur
+*   bestimmte Teile der Auftragsköpfe geändert werden. Falls aber Kunden
+*   bereits eine entsprechende BAdI-Implementation erstellt haben, wird
+*   Nacharbeit notwendig, um die alte Logik nach wie vor zu
+*   unterstützen
+    LOOP AT it_header.
+      MOVE-CORRESPONDING it_header TO ls_bapihead.
+      APPEND ls_bapihead TO lt_bapihead.
+    ENDLOOP.
+    LOOP AT it_header_up.
+      MOVE-CORRESPONDING it_header_up TO ls_bapihead_up.
+      APPEND ls_bapihead_up TO lt_bapihead_up.
+    ENDLOOP.
+    LOOP AT it_header_srv.
+      MOVE-CORRESPONDING it_header_srv TO ls_bapisrvcdata.
+      MOVE it_header_srv-material_long TO ls_bapisrvcdata-material.       "MFLE
+      APPEND ls_bapisrvcdata TO lt_bapisrvcdata.
+    ENDLOOP.
+    LOOP AT it_header_srv_up.
+      MOVE-CORRESPONDING it_header_srv_up TO ls_bapisrvcdata_up.
+      MOVE it_header_srv_up-material_long TO ls_bapisrvcdata_up-material. "MFLE
+      APPEND ls_bapisrvcdata_up TO lt_bapisrvcdata_up.
+    ENDLOOP.
+*   Before-Image für externe Datenrepräsentation sichern
+    lt_bapihead_old        = lt_bapihead.
+    lt_bapihead_old_up     = lt_bapihead_up.
+    lt_bapisrvcdata_old    = lt_bapisrvcdata.
+    lt_bapisrvcdata_old_up = lt_bapisrvcdata_up.
+
+    CLEAR lt_extension_up.                             " Note 1989741
+    cl_im_eams_ord_cfd_write=>extension_in_tab = extension_in[].
+    cl_im_eams_ord_oper_cfd_write=>extension_in_tab = extension_in[].
+    LOOP AT extension_in.
+      CALL METHOD sr_modify_input_data->modify_input_data
+        EXPORTING
+          extension_in                = extension_in
+        CHANGING
+          ct_methods                  = lt_methods
+          ct_header                   = lt_bapihead
+          ct_header_up                = lt_bapihead_up
+          ct_header_srv               = lt_bapisrvcdata
+          ct_header_srv_up            = lt_bapisrvcdata_up
+          ct_userstatus               = lt_userstatus
+          ct_partner                  = lt_partner
+          ct_partner_up               = lt_partner_up
+          ct_operation                = lt_afvgd
+          ct_operation_up             = lt_afvgd_up
+          ct_relation                 = lt_afabd
+          ct_relation_up              = lt_afabd_up
+          ct_component                = lt_resbd
+          ct_component_up             = lt_resbd_up
+          ct_objectlist               = lt_riwol
+          ct_text                     = lt_text
+          ct_text_lines               = lt_text_lines
+          ct_messages                 = lt_messages
+          ct_header_int               = lt_caufvd
+          ct_header_int_up            = lt_caufvd_up
+          ct_pmsdo_srv                = lt_pmsdo
+          ct_pmsdo_srv_up             = lt_pmsdo_up
+          ct_reforder_item_int        = lt_afpod
+          ct_reforder_item_int_up     = lt_afpod_up
+          ct_reforder_comp            = lt_afpod_resbd
+          ct_reforder_comp_up         = lt_afpod_resbd_up
+          ct_reforder_serno_olist_ins = lt_serno_olist_ins
+          ct_reforder_serno_olist_del = lt_serno_olist_del
+          ct_prt                      = lt_prt
+          ct_prt_up                   = lt_prt_up
+          ct_serviceoutline           = lt_serviceoutline
+          ct_serviceoutline_up        = lt_serviceoutline_up
+          ct_servicelines             = lt_servicelines
+          ct_servicelines_up          = lt_servicelines_up
+          ct_servicelimit             = lt_servicelimit
+          ct_servicelimit_up          = lt_servicelimit_up
+          ct_servicecontractlimits    = lt_servicecontractlimits
+          ct_servicecontractlimits_up = lt_servicecontractlimits_up
+          ct_estimated_costs          = lt_est_cost.           " 1672966 EAMCC PM110
+* Note 1989741 - begin
+      IF extension_in-structure IS NOT INITIAL.
+        ls_extension_up-fieldname  = extension_in-structure.
+        ls_extension_up-bapiupdate = 'X'.
+        APPEND ls_extension_up TO lt_extension_up.
+      ENDIF.
+* Note 1989741 - end
+    ENDLOOP.
+
+*   Before- und After-Image für alte Logik vergleichen:
+*   Bei Delta nur die externe Repräsentation der Kopfdaten verwenden
+    IF lt_bapihead_old        <> lt_bapihead
+    OR lt_bapihead_old_up     <> lt_bapihead_up
+    OR lt_bapisrvcdata_old    <> lt_bapisrvcdata
+    OR lt_bapisrvcdata_old_up <> lt_bapisrvcdata_up.
+*     Aus im BAdI veränderten Daten Import-Daten wiederherstellen,
+*     Konvertierung für Kopfdaten erneut durchführen
+      LOOP AT lt_bapihead INTO ls_bapihead.
+        MOVE-CORRESPONDING ls_bapihead TO ls_header.
+        APPEND ls_header TO lt_header.
+      ENDLOOP.
+      LOOP AT lt_bapihead_up INTO ls_bapihead_up.
+        MOVE-CORRESPONDING ls_bapihead_up TO ls_header_up.
+        APPEND ls_header_up TO lt_header_up.
+      ENDLOOP.
+      LOOP AT lt_bapisrvcdata INTO ls_bapisrvcdata.
+        MOVE-CORRESPONDING ls_bapisrvcdata TO ls_header_srv.
+        ls_header_srv-material_long = ls_bapisrvcdata-material.   "MFLE
+        CLEAR: ls_header_srv-material.                            "MFLE
+        APPEND ls_header_srv TO lt_header_srv.
+      ENDLOOP.
+      LOOP AT lt_bapisrvcdata_up INTO ls_bapisrvcdata_up.
+        MOVE-CORRESPONDING ls_bapisrvcdata_up TO ls_header_srv_up.
+        ls_header_srv_up-material_long = ls_bapisrvcdata_up-material.   "MFLE
+        APPEND ls_header_srv_up TO lt_header_srv_up.
+      ENDLOOP.
+      CALL FUNCTION 'IBAPI_PROC_INTERFACE_E2I'
+        EXPORTING
+          it_header        = lt_header[]
+          it_header_up     = lt_header_up[]
+          it_header_srv    = lt_header_srv[]
+          it_header_srv_up = lt_header_srv_up[]
+          it_userstatus    = it_userstatus[]
+          it_partner       = it_partner[]
+          it_operation     = it_operation[]
+          it_relation      = it_relation[]
+          it_component     = it_component[]
+          it_text          = it_text[]
+          it_text_lines    = it_text_lines[]
+        IMPORTING
+          et_caufvd        = lt_caufvd
+          et_caufvd_up     = lt_caufvd_up
+          et_caufvd_srv    = lt_pmsdo
+          et_caufvd_srv_up = lt_pmsdo_up
+        EXCEPTIONS
+          conversion_error = 1
+          textline_error   = 2
+          OTHERS           = 3.
+      IF sy-subrc NE 0.
+        PERFORM end_bapi USING lv_bapiflag_origin CHANGING return[]."note 3406469
+        EXIT.
       ENDIF.
     ENDIF.
-
-    " Always log
-    PERFORM f_write_log USING <ls_output_row>-aufnr
-                               <ls_output_row>-vornr
-                               <ls_output_row>-werks
-                               'CMXS'
-                               <ls_output_row>-msg.
-
-  ENDLOOP.
-
-  COMMIT WORK.
-ENDFORM.
-
-*---------------------------------------------------------------------*
-* Display ALV (SALV)
-*---------------------------------------------------------------------*
-FORM f_display.
-  TRY .
-      cl_salv_table=>factory(
-        IMPORTING r_salv_table = DATA(lo_salv)
-        CHANGING  t_table      = gt_output ).
-      lo_salv->get_columns( )->set_optimize( ).
-      lo_salv->get_functions( )->set_all( ).
-      lo_salv->display( ).
-    CATCH cx_salv_msg.
-  ENDTRY.
-ENDFORM.
-
-*---------------------------------------------------------------------*
-* Send JSON payload to CPI (using work area instead of field-symbol)
-*---------------------------------------------------------------------*
-FORM f_send_to_cpi.
-  DATA: lv_payload    TYPE string,
-        lv_content    TYPE string VALUE 'application/json',
-        lv_rfc        TYPE rfcdest VALUE 'CMX_WorkOrder',
-        lv_status     TYPE i,
-        lv_status_c   TYPE char10,
-        lv_response   TYPE string.
-
-  " Build JSON payload
-  TRY.
-      lv_payload = xco_ku_json=>data->from_abap( gt_output )->to_string( ).
-    CATCH cx_sxml_error INTO DATA(lx_error).
-      LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
-        <ls_output_row>-msg = |JSON build failed: { lx_error->get_text( ) }|.
-        PERFORM f_write_log USING <ls_output_row>-aufnr
-                                   <ls_output_row>-vornr
-                                   <ls_output_row>-werks
-                                   'CMXS'
-                                   <ls_output_row>-msg.
-      ENDLOOP.
-      RETURN.
-  ENDTRY.
-
-  " Create HTTP client
-  cl_http_client=>create_by_destination(
-    EXPORTING destination = lv_rfc
-    IMPORTING client      = DATA(lo_http_client)
-    EXCEPTIONS OTHERS     = 1 ).
-  IF sy-subrc <> 0.
-    LOOP AT gt_output ASSIGNING <ls_output_row>.
-      <ls_output_row>-msg = 'HTTP client creation failed'.
-      PERFORM f_write_log USING <ls_output_row>-aufnr
-                                 <ls_output_row>-vornr
-                                 <ls_output_row>-werks
-                                 'CMXS'
-                                 <ls_output_row>-msg.
-    ENDLOOP.
-    RETURN.
   ENDIF.
 
-  " HTTP headers + body
-  lo_http_client->request->set_header_field(
-    name  = '~request_method' value = 'POST' ).
-  lo_http_client->request->set_header_field(
-    name  = 'Content-Type' value = lv_content ).
-  lo_http_client->request->set_cdata( lv_payload ).
+* Messages vom BADI auswerten und ins BAPI-Log scheiben
+* Fehler in Tabelle RETURN schreiben.
+* Bei Message E oder A bricht der Bapi ab
+  CLEAR return[].
+  LOOP AT lt_messages INTO ls_messages.
+    CALL FUNCTION 'BALW_BAPIRETURN_GET2'
+      EXPORTING
+        type   = ls_messages-msgty
+        cl     = ls_messages-msgid
+        number = ls_messages-msgno
+        par1   = ls_messages-msgv1
+        par2   = ls_messages-msgv2
+        par3   = ls_messages-msgv3
+        par4   = ls_messages-msgv4
+      IMPORTING
+        return = ls_return.
+    APPEND ls_return TO return[].
+    IF ls_messages-msgty CA 'AE'.
+      MOVE 4 TO lv_error.
+    ENDIF.
+  ENDLOOP.          "Message-Log zurückgeben
+  IF lv_error NE 0.
+    EXIT.
+  ENDIF.
 
-  " Send + receive
-  TRY.
-      lo_http_client->send( ).
-      lo_http_client->receive( ).
-    CATCH cx_root INTO DATA(lx_comm_error).
-      LOOP AT gt_output ASSIGNING <ls_output_row>.
-        <ls_output_row>-msg = |HTTP communication error: { lx_comm_error->get_text( ) }|.
-        PERFORM f_write_log USING <ls_output_row>-aufnr
-                                   <ls_output_row>-vornr
-                                   <ls_output_row>-werks
-                                   'CMXS'
-                                   <ls_output_row>-msg.
-      ENDLOOP.
-      RETURN.
-  ENDTRY.
+* Prüfen, ob der Trace geschrieben werden soll,
+* und ihn dann auf das Frontend schreiben. Dies
+* geht natürlich nur, wenn der BAPI vom Frontend
+* aus aufgerufen wird.
+* Der Trace kann auch dazu dienen festzustellen, ob die
+* Daten korrekt kovertiert wurden, und der BADI das
+* richtige gemacht hat.
+  CALL FUNCTION 'IBAPI_PROC_SAVE_TRACE'
+    EXPORTING
+      it_header        = lt_caufvd
+      it_header_up     = lt_caufvd_up
+      it_header_srv    = lt_pmsdo
+      it_header_srv_up = lt_pmsdo_up
+      it_userstatus    = lt_userstatus
+      it_partner       = lt_partner
+      it_partner_up    = lt_partner_up
+      it_operation     = lt_afvgd
+      it_operation_up  = lt_afvgd_up
+      it_relation      = lt_afabd
+      it_relation_up   = lt_afabd_up
+      it_component     = lt_resbd
+      it_component_up  = lt_resbd_up
+      it_objectlist    = lt_riwol
+      it_srule         = lt_cobl
+      it_srule_up      = lt_cobl_up
+      it_text          = lt_text
+      it_text_lines    = lt_text_lines
+      it_tasklists     = lt_tasklists
+    CHANGING
+      ct_methods       = lt_methods.
 
-  " Check status
-  lo_http_client->response->get_status( IMPORTING code = lv_status ).
-  WRITE lv_status TO lv_status_c.
+* Methodentabelle auf Konsistenz prüfen und in internes
+* Format umsetzen. Bestimmen, welche Aufträge in die
+* Belegtabelle gelesen werden müssen.
+  CALL FUNCTION 'IBAPI_PROC_METHOD_TABLE_E2I'
+    IMPORTING
+      et_orders                 = lt_orders
+    CHANGING
+      ct_method_table           = lt_methods
+    EXCEPTIONS
+      object_unknown            = 1
+      method_unknown            = 2
+      invalid_order_key         = 3
+      required_order_no_created = 4
+      save_or_dialog_required   = 5
+      OTHERS                    = 6.
+  IF sy-subrc NE 0.
+* Fehler werden bereits in FB geloggt
+* setzen des Fehlerflags und verlassen des Bapis
+    PERFORM end_bapi using lv_bapiflag_origin CHANGING return[].   "note 3406469
+    EXIT.
+  ENDIF.
 
-  " Get response body (for debugging CPI errors)
-  lv_response = lo_http_client->response->get_cdata( ).
+* Reihenfolge der Bearbeitung festlegen. ******************
+* dies ist vor allem dann wichtig, wenn *******************
+* Anordnungsbeziehungen zwischen neu **********************
+* angelegten Vorgängen erzeugt werden sollen. *************
 
-  " Log results
-  LOOP AT gt_output ASSIGNING <ls_output_row>.
-    IF lv_status = 200.
-      <ls_output_row>-msg = 'CPI success'.
-    ELSE.
-      <ls_output_row>-msg = |CPI error { lv_status_c }: { lv_response }|.
+  CALL FUNCTION 'IBAPI_SET_METHOD_LEVEL'
+    EXPORTING
+      it_methods      = lt_methods
+    IMPORTING
+      et_method_level = lt_method_level.
+
+* Lesen der Aufträge in die Belegtabellen und sperren.
+  CALL FUNCTION 'IBAPI_READ_AND_LOCK_ORDERS'
+    EXPORTING
+      it_aufnr          = lt_orders
+      it_methods        = lt_methods
+    EXCEPTIONS
+      order_not_found   = 1
+      release_no_change = 2
+      order_locked      = 3
+      OTHERS            = 4.
+  IF sy-subrc NE 0.
+* Fehler beim Lesen der Aufträge in die Belegtabellen
+    PERFORM end_bapi using lv_bapiflag_origin CHANGING return[].   "note 3406469
+    EXIT.
+  ENDIF.
+
+* For supporting geospatial data processing,the code related to note 2550268 is disabled
+**-- check orders is geo enabled                     note 2550268
+*  PERFORM eamgef_order_check USING it_header[]
+*                                   lt_method_level
+*                           CHANGING lv_error.
+*  IF lv_error NE 0.
+*    PERFORM end_bapi CHANGING return[].
+*    EXIT.
+*  ENDIF.                                            "note 2550268
+* For supporting geospatial data processing,the code related to note 2550268 is disabled
+
+* Linear Asset Management EhP5
+  IF cl_ops_switch_check=>eam_sfws_lfe( ) IS NOT INITIAL.
+
+    CALL METHOD cl_eaml_ea_bapi_util=>set_order_data_buf
+      EXPORTING
+        it_header       = it_header[]
+        it_header_up    = it_header_up[]
+        it_operation    = it_operation[]
+        it_operation_up = it_operation_up[].
+
+  ENDIF.
+
+* >>>>> Begin note 2304265: DFPS specific checks
+  CLEAR lv_method_del.
+  IF cl_check_switch=>dfps_is_active( ) = abap_true.
+    PERFORM dfps_auth_check TABLES   it_header
+                                     return
+                            CHANGING lt_method_level
+                                     lv_method_del.
+  ENDIF.
+  IF lv_method_del = abap_true.
+* At least one method was deleted by the DFPS change protection checks, therefore it will be checked in the following
+* if only a save method remains in the processing methods. If yes, this save must no longer be processed.
+    IF lines( lt_method_level ) = 1.
+      READ TABLE lt_method_level TRANSPORTING NO FIELDS WITH KEY method = if_eams_bo_const=>gc_bapi_ord_method-save.
+      IF sy-subrc = 0.
+* only a save method exists ==> delete this method too
+        CLEAR lt_method_level.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+  IF lt_method_level IS NOT INITIAL.
+* <<<<< End note 2304265
+
+* Ausführen der in der Methodentabelle hinterlegten *******
+* Methoden ************************************************
+    CALL FUNCTION 'IBAPI_PROC_METHOD_TABLE_EXEC'
+      EXPORTING
+        it_proc_level_tab            = lt_method_level
+        it_order_tab                 = lt_caufvd
+        it_order_up_tab              = lt_caufvd_up
+        it_order_srv_tab             = lt_pmsdo
+        it_order_srv_up_tab          = lt_pmsdo_up
+        it_userstatus_tab            = lt_userstatus
+        it_partner_tab               = lt_partner
+        it_partner_up_tab            = lt_partner_up
+        it_operation_tab             = lt_afvgd
+        it_operation_up_tab          = lt_afvgd_up
+        it_relation_tab              = lt_afabd
+        it_relation_up_tab           = lt_afabd_up
+        it_component_tab             = lt_resbd
+        it_component_up_tab          = lt_resbd_up
+        it_objectlist_tab            = lt_riwol
+        it_objectlist_up_tab         = lt_riwol_up
+        it_olist_relation_tab        = lt_olist_relation
+        it_cobl_tab                  = lt_cobl
+        it_cobl_up_tab               = lt_cobl_up
+        it_text_tab                  = lt_text
+        it_text_lines_tab            = lt_text_lines
+        it_tasklists                 = lt_tasklists
+        it_extension_up              = lt_extension_up     " Note 1989741
+        it_reforder_item             = lt_afpod
+        it_reforder_item_up          = lt_afpod_up
+        it_reforder_comp             = lt_afpod_resbd
+        it_reforder_comp_up          = lt_afpod_resbd_up
+        it_reforder_operation        = lt_reford_afvgd
+        it_reforder_serno_olist_ins  = lt_serno_olist_ins
+        it_reforder_serno_olist_del  = lt_serno_olist_del
+        it_prt                       = lt_prt
+        it_prt_up                    = lt_prt_up
+        it_serviceoutline            = lt_serviceoutline
+        it_serviceoutline_up         = lt_serviceoutline_up
+        it_servicelines              = lt_servicelines
+        it_servicelines_up           = lt_servicelines_up
+        it_servicelimit              = lt_servicelimit
+        it_servicelimit_up           = lt_servicelimit_up
+        it_servicecontractlimits     = lt_servicecontractlimits
+        it_servicecontractlimits_up  = lt_servicecontractlimits_up
+        it_permit                    = lt_permit
+        it_permit_up                 = lt_permit_up
+        it_permit_issue              = lt_permit_issue
+        iv_mmsrv_external_maintenace = iv_mmsrv_external_maintenace
+        it_estimated_costs           = lt_est_cost               " 1672966 EAMCC PM110
+        it_text_add_tab              = lt_text_add              "note 2756658
+        it_settlmt_profile           = lt_settlmt_profile
+      IMPORTING
+        et_numbers                   = et_numbers[]
+        et_notif_numbers             = et_notification_numbers[]
+      EXCEPTIONS
+        data_for_method_not_found    = 1
+        method_not_supported         = 2
+        error_in_processing          = 3
+        OTHERS                       = 4.
+    IF sy-subrc NE 0.
+* Fehler &1 beim Bearbeiten der Bapi-Methoden
+      MESSAGE e113(iwo_bapi2) INTO mess.
+      bapi_message.
+*   New with ERP 2005: If order headers are created BUT subsequent objects
+*   led to an error, the order header update flag is now set to 'IGNORE' for
+*   update processes.
+      PERFORM reset_created_headers USING et_numbers[] lt_method_level.
+      PERFORM end_bapi using lv_bapiflag_origin CHANGING return[]. "note 3406469
+      EXIT.
     ENDIF.
 
-    PERFORM f_write_log USING <ls_output_row>-aufnr
-                               <ls_output_row>-vornr
-                               <ls_output_row>-werks
-                               'CMXS'
-                               <ls_output_row>-msg.
-  ENDLOOP.
+  ENDIF. "DFPS note 2304265
+* Lesen des Application Logs und zurückgeben der **********
+* Meldungen in die Exporttabelle **************************
+  END-TEST-SEAM.                                                   "note 3366949
+  PERFORM end_bapi using lv_bapiflag_origin CHANGING return[].     "note 3406469
 
-  COMMIT WORK.  " Ensure logs are saved
-ENDFORM.
-
-*---------------------------------------------------------------------*
-* Write entry to ZCMX_RUN_LOG
-*---------------------------------------------------------------------*
-FORM f_write_log USING    pv_aufnr   TYPE aufnr
-                          pv_vornr   TYPE vornr
-                          pv_werks   TYPE werks_d
-                          pv_stat    TYPE char20
-                          pv_msg     TYPE char72.
-
-  DATA: ls_log TYPE zcmx_run_log.
-
-  CLEAR ls_log.
-  CONCATENATE sy-datum sy-uzeit sy-uname INTO ls_log-logid.
-  ls_log-mandt      = sy-mandt.
-  ls_log-aufnr      = pv_aufnr.
-  ls_log-vornr      = pv_vornr.
-  ls_log-werks      = pv_werks.
-  ls_log-stat       = pv_stat.
-  ls_log-system_id  = sy-sysid.
-  ls_log-run_date   = sy-datum.
-  ls_log-run_time   = sy-uzeit.
-  ls_log-msg        = pv_msg.
-  ls_log-created_by = sy-uname.
-
-  INSERT zcmx_run_log FROM ls_log.
-ENDFORM.
+  TEST-SEAM get_bapi_maintain3.                                    "note 3366949
+ENHANCEMENT-POINT bapi_alm_order_maintain_g7 SPOTS es_saplibapi_alm_order.
+  END-TEST-SEAM.                                                   "note 3366949
+ENDFUNCTION.
