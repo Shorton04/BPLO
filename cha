@@ -1,67 +1,29 @@
 *---------------------------------------------------------------------*
-* Display ALV (SALV) - safe version
+* Write entry to ZCMX_RUN_LOG
 *---------------------------------------------------------------------*
-FORM f_display.
-  DATA lx_notfound TYPE REF TO cx_salv_not_found.
-  DATA lx_salv_msg TYPE REF TO cx_salv_msg.
+FORM f_write_log USING    pv_aufnr   TYPE aufnr
+                          pv_vornr   TYPE vornr
+                          pv_werks   TYPE werks_d
+                          pv_stat    TYPE char20
+                          pv_msg     TYPE string.
 
-  " If no data, avoid calling SALV at all
-  IF gt_output IS INITIAL.
-    MESSAGE 'No orders to display' TYPE 'I'.
-    RETURN.
-  ENDIF.
+  DATA: ls_log TYPE zcmx_run_log.
 
-  TRY.
-      cl_salv_table=>factory(
-        IMPORTING r_salv_table = DATA(lo_salv)
-        CHANGING  t_table      = gt_output ).
+  CLEAR ls_log.
+  CONCATENATE sy-datum sy-uzeit sy-uname INTO ls_log-logid.
+  ls_log-mandt      = sy-mandt.
+  ls_log-aufnr      = pv_aufnr.
+  ls_log-vornr      = pv_vornr.
+  ls_log-werks      = pv_werks.
+  ls_log-stat       = pv_stat.
+  ls_log-system_id  = sy-sysid.
+  ls_log-run_date   = sy-datum.
+  ls_log-run_time   = sy-uzeit.
+  ls_log-created_by = sy-uname.
 
-      " Basic tuning
-      lo_salv->get_columns( )->set_optimize( ).
-      lo_salv->get_functions( )->set_all( ).
+  " Convert string -> CHAR255 safely
+  ls_log-msg = pv_msg.   " will be truncated automatically if > 255 chars
 
-      " Get columns object
-      DATA(lo_columns) = lo_salv->get_columns( ).
-
-      " Add readable headers safely
-      TRY.
-          lo_columns->get_column( 'STAT_TXT' )->set_short_text( 'Status' ).
-          lo_columns->get_column( 'STAT_TXT' )->set_medium_text( 'Order Status' ).
-          lo_columns->get_column( 'STAT_TXT' )->set_long_text( 'Order Header Status' ).
-        CATCH cx_salv_not_found INTO lx_notfound.
-          " column missing, ignore
-      ENDTRY.
-
-      TRY.
-          lo_columns->get_column( 'OBJ_TXT' )->set_short_text( 'Object' ).
-          lo_columns->get_column( 'OBJ_TXT' )->set_medium_text( 'Technical Object' ).
-          lo_columns->get_column( 'OBJ_TXT' )->set_long_text( 'Equipment/Location' ).
-        CATCH cx_salv_not_found INTO lx_notfound.
-      ENDTRY.
-
-      TRY.
-          lo_columns->get_column( 'MSG' )->set_short_text( 'Message' ).
-          lo_columns->get_column( 'MSG' )->set_medium_text( 'Error Text' ).
-          lo_columns->get_column( 'MSG' )->set_long_text( 'Processing Message' ).
-        CATCH cx_salv_not_found INTO lx_notfound.
-      ENDTRY.
-
-      TRY.
-          lo_columns->get_column( 'CPI_STATUS' )->set_short_text( 'CPI' ).
-          lo_columns->get_column( 'CPI_STATUS' )->set_medium_text( 'CPI Status' ).
-          lo_columns->get_column( 'CPI_STATUS' )->set_long_text( 'CPI Processing Status' ).
-        CATCH cx_salv_not_found INTO lx_notfound.
-      ENDTRY.
-
-      " Display ALV
-      lo_salv->display( ).
-
-    CATCH cx_salv_not_found INTO lx_notfound.
-      MESSAGE lx_notfound->get_text( ) TYPE 'I'.
-
-    CATCH cx_salv_msg INTO lx_salv_msg.
-      MESSAGE lx_salv_msg->get_text( ) TYPE 'I'.
-
-  ENDTRY.
+  INSERT zcmx_run_log FROM ls_log.
 
 ENDFORM.
