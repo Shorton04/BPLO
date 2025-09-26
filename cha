@@ -29,3 +29,90 @@ DATA: gt_orders TYPE TABLE OF viaufkst,
       gs_order  TYPE viaufkst.
 
 DATA: gv_atinn TYPE atinn.   "INTERFACE characteristic ID
+
+
+
+
+
+*---------------------------------------------------------------------*
+* Update SAP status (now using work area, not field-symbols)
+*---------------------------------------------------------------------*
+FORM f_send_cmx.
+  DATA ls_output LIKE LINE OF gt_output.
+
+  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
+    DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
+          lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
+          lt_methods TYPE TABLE OF bapi_alm_order_method,
+          ls_header  TYPE bapi_alm_order_headers_i,
+          ls_status  TYPE bapi_alm_order_usrstat,
+          ls_method  TYPE bapi_alm_order_method,
+          lt_return  TYPE TABLE OF bapiret2,
+          ls_return  TYPE bapiret2.
+
+    CLEAR: lt_header, lt_status, lt_methods, lt_return.
+
+    " Header
+    ls_header-orderid = <ls_output_row>-aufnr.
+    APPEND ls_header TO lt_header.
+
+    " User status
+    ls_status-user_st_text = 'CMXS'.
+    ls_status-langu        = 'EN'.
+    ls_status-langu_iso    = 'E'.
+    APPEND ls_status TO lt_status.
+
+    " Method for user status
+    ls_method-refnumber = '000001'.
+    ls_method-objecttype = 'HEADER'.
+    ls_method-method     = 'STATUS'.
+    ls_method-objectkey  = <ls_output_row>-aufnr.
+    APPEND ls_method TO lt_methods.
+
+    " Call BAPI
+    CALL FUNCTION 'BAPI_ALM_ORDER_MAINTAIN'
+      TABLES
+        it_header     = lt_header
+        it_methods    = lt_methods
+        it_userstatus = lt_status
+        return        = lt_return
+      EXCEPTIONS
+        OTHERS        = 1.
+
+    IF sy-subrc <> 0.
+      <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
+      PERFORM f_write_log USING <ls_output_row>-aufnr
+                                 <ls_output_row>-vornr
+                                 <ls_output_row>-werks
+                                 'CMXS'
+                                 <ls_output_row>-msg.
+      CONTINUE.
+    ENDIF.
+
+    " Collect BAPI return messages
+    DATA(lv_msg) = ``.
+    LOOP AT lt_return INTO ls_return.
+      CONCATENATE lv_msg ls_return-type ls_return-id ls_return-number ls_return-message
+        INTO lv_msg SEPARATED BY space.
+    ENDLOOP.
+
+    IF lv_msg IS NOT INITIAL.
+      <ls_output_row>-msg = lv_msg.
+      CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+    ELSE.
+      <ls_output_row>-msg = 'CMXS status updated successfully'.
+      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+        EXPORTING wait = 'X'.
+    ENDIF.
+
+    " Always log
+    PERFORM f_write_log USING <ls_output_row>-aufnr
+                               <ls_output_row>-vornr
+                               <ls_output_row>-werks
+                               'CMXS'
+                               <ls_output_row>-msg.
+
+  ENDLOOP.
+
+  COMMIT WORK.
+ENDFORM.
