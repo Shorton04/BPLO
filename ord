@@ -20,10 +20,10 @@ FORM f_send_cmx.
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
-    " User status
+    " User status (your system uses USERSTATUS instead of ORDERID/USER_ST)
     CLEAR ls_status.
-    ls_status-orderid  = <ls_output_row>-aufnr.  " Correct field
-    ls_status-user_st  = 'E0014'.                " Internal status CMXS
+    ls_status-objnr       = <ls_output_row>-aufnr.   " Link to order
+    ls_status-userstatus  = 'E0014'.                 " Internal status CMXS
     APPEND ls_status TO lt_status.
 
     " Method
