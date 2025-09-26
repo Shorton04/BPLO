@@ -5,9 +5,10 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
                           pv_vornr   TYPE vornr
                           pv_werks   TYPE werks_d
                           pv_stat    TYPE char20
-                          pv_msg     TYPE string.
+                          pv_msg     TYPE string.   " accept string from caller
 
-  DATA: ls_log TYPE zcmx_run_log.
+  DATA: ls_log    TYPE zcmx_run_log,
+        lv_msg255 TYPE zmsg_txt.      " CHAR255 (same as table field)
 
   CLEAR ls_log.
   CONCATENATE sy-datum sy-uzeit sy-uname INTO ls_log-logid.
@@ -21,8 +22,9 @@ FORM f_write_log USING    pv_aufnr   TYPE aufnr
   ls_log-run_time   = sy-uzeit.
   ls_log-created_by = sy-uname.
 
-  " Convert string -> CHAR255 safely
-  ls_log-msg = pv_msg.   " will be truncated automatically if > 255 chars
+  " Explicit conversion string -> CHAR255
+  lv_msg255 = pv_msg.
+  ls_log-msg = lv_msg255.
 
   INSERT zcmx_run_log FROM ls_log.
 
