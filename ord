@@ -15,18 +15,18 @@ FORM f_send_cmx.
 
     CLEAR: lt_header, lt_status, lt_methods, lt_return.
 
-    " Header (orderid is aufnr)
+    " Header
     CLEAR ls_header.
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
     " User status
     CLEAR ls_status.
-    ls_status-objnr       = <ls_output_row>-aufnr.  " Order number as object
-    ls_status-userstatus  = 'E0014'.                " Internal status CMXS
+    ls_status-orderid  = <ls_output_row>-aufnr.  " Correct field
+    ls_status-user_st  = 'E0014'.                " Internal status CMXS
     APPEND ls_status TO lt_status.
 
-    " Method for user status
+    " Method
     CLEAR ls_method.
     ls_method-refnumber  = '000001'.
     ls_method-objecttype = 'HEADER'.
