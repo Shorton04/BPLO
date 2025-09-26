@@ -2,8 +2,7 @@
 * Update SAP status (CMXS)
 *---------------------------------------------------------------------*
 FORM f_send_cmx.
-  DATA: ls_output TYPE ty_output,
-        lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
+  DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
         lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
         lt_methods TYPE TABLE OF bapi_alm_order_method,
         lt_return  TYPE TABLE OF bapiret2,
@@ -16,15 +15,15 @@ FORM f_send_cmx.
 
     CLEAR: lt_header, lt_status, lt_methods, lt_return.
 
-    " Header
+    " Header (orderid is aufnr)
     CLEAR ls_header.
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
-    " User status (must use USER_ST, not USER_ST_TEXT!)
+    " User status
     CLEAR ls_status.
-    ls_status-orderid = <ls_output_row>-aufnr.
-    ls_status-user_st = 'E0014'.   " CMXS internal code from TJ30
+    ls_status-objnr       = <ls_output_row>-aufnr.  " Order number as object
+    ls_status-userstatus  = 'E0014'.                " Internal status CMXS
     APPEND ls_status TO lt_status.
 
     " Method for user status
