@@ -1,36 +1,44 @@
-*---------------------------------------------------------------------*
-* Update SAP status (CMXS)
-*---------------------------------------------------------------------*
 FORM f_send_cmx.
-  DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
-        lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
-        lt_methods TYPE TABLE OF bapi_alm_order_method,
-        lt_return  TYPE TABLE OF bapiret2,
-        ls_status  TYPE bapi_alm_order_usrstat,
-        ls_header  TYPE bapi_alm_order_headers_i,
-        ls_method  TYPE bapi_alm_order_method,
-        ls_return  TYPE bapiret2.
+  DATA ls_output LIKE LINE OF gt_output.
+    LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
 
-  LOOP AT gt_output ASSIGNING FIELD-SYMBOL(<ls_output_row>).
+    DATA: lt_header  TYPE TABLE OF bapi_alm_order_headers_i,
+          lt_status  TYPE TABLE OF bapi_alm_order_usrstat,
+          lt_methods TYPE TABLE OF bapi_alm_order_method,
+          ls_header  TYPE bapi_alm_order_headers_i,
+          ls_status  TYPE bapi_alm_order_usrstat,
+          ls_method  TYPE bapi_alm_order_method,
+          lt_return  TYPE TABLE OF bapiret2,
+          ls_return  TYPE bapiret2.
 
     CLEAR: lt_header, lt_status, lt_methods, lt_return.
 
     " Header
-    CLEAR ls_header.
     ls_header-orderid = <ls_output_row>-aufnr.
     APPEND ls_header TO lt_header.
 
-    " User status (your system uses USERSTATUS instead of ORDERID/USER_ST)
+
+    " User status
     CLEAR ls_status.
-    ls_status-objnr       = <ls_output_row>-aufnr.   " Link to order
-    ls_status-userstatus  = 'E0014'.                 " Internal status CMXS
+    ls_status-user_st_text = 'E0014'.
+    ls_status-inactive     = ''.
+    ls_status-change_event = '01'.
+    ls_status-langu_iso    = 'EN'.
     APPEND ls_status TO lt_status.
 
-    " Method
+    " Method for user status
     CLEAR ls_method.
-    ls_method-refnumber  = '000001'.
+    ls_method-refnumber = '000001'.
+    ls_method-objecttype = 'USERSTATUS'.
+    ls_method-method     = 'CHANGE'.
+    ls_method-objectkey  = <ls_output_row>-aufnr.
+    APPEND ls_method TO lt_methods.
+
+    " Method for user status
+    CLEAR ls_method.
+    ls_method-refnumber = '000002'.
     ls_method-objecttype = 'HEADER'.
-    ls_method-method     = 'USERSTATUS'.
+    ls_method-method     = 'SAVE'.
     ls_method-objectkey  = <ls_output_row>-aufnr.
     APPEND ls_method TO lt_methods.
 
@@ -47,6 +55,7 @@ FORM f_send_cmx.
     IF sy-subrc <> 0.
       <ls_output_row>-msg = |BAPI call failed (SY-SUBRC={ sy-subrc })|.
     ELSE.
+      " Check messages
       READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
       IF sy-subrc = 0.
         <ls_output_row>-msg = ls_return-message.
@@ -54,8 +63,7 @@ FORM f_send_cmx.
       ELSE.
         <ls_output_row>-msg = 'CMXS status updated successfully'.
         CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
-          EXPORTING
-            wait = 'X'.
+          EXPORTING wait = 'X'.
       ENDIF.
     ENDIF.
 
